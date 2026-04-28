@@ -3,6 +3,7 @@ import { Link, Redirect } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Dimensions, Pressable, ScrollView, Text, View, useColorScheme } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
@@ -88,18 +89,22 @@ export default function GetStartedScreen() {
   if (isLoaded && isSignedIn) return <Redirect href="/(tabs)" />;
 
   return (
+    <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-slate-50 dark:bg-slate-950">
     <View className="flex-1 flex-col flex gap-8 justify-between bg-slate-50 dark:bg-slate-950">
       <View className="">
       <View className="px-8 pt-16 pb-6">
         <View className="items-center">
           {/* Logo Mark */}
+          <View className="flex-row items-center justify-center gap-2">
           <View className="mb-4 h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 shadow-lg shadow-blue-600/25">
             <FontAwesome name="plane" size={28} color="#ffffff" />
           </View>
           
-          <Text className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+          <Text className="text-3xl font-bold tracking-tight text-blue-600 dark:text-blue-600">
             Log24
           </Text>
+          </View>
+          
           <Text className="mt-2 text-center text-base text-slate-500 dark:text-slate-400">
             Your digital pilot logbook starts here
           </Text>
@@ -178,6 +183,7 @@ export default function GetStartedScreen() {
         </View>
       </View>
     </View>
+    </SafeAreaView>
   );
 }
 
@@ -218,7 +224,7 @@ function FeatureCard({
         { width: FEATURE_WIDTH, marginRight: CARD_MARGIN },
         animatedStyle,
       ]}
-      className=" bg-white p-8 dark:bg-transparent"
+      className=" bg-white p-8 dark:bg-transparent flex flex-col gap-4 items-center justify-center"
     >
       {/* Icon Container */}
       <View className="h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 dark:bg-blue-950">
@@ -230,7 +236,7 @@ function FeatureCard({
       </View>
 
       {/* Content */}
-      <Text className="mt-8 text-2xl font-bold text-slate-900 dark:text-white leading-tight">
+      <Text className="mt-8 text-2xl font-bold text-blue-600 dark:text-blue-600 leading-tight">
         {feature.title}
       </Text>
       <Text className="mt-3 text-base leading-relaxed text-slate-500 dark:text-slate-400">

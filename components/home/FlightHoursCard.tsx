@@ -9,13 +9,13 @@ type FlightHoursCardProps = {
 
 function MetricCell({ metric }: { metric: FlightMetric }) {
   return (
-    <View className="flex-1 px-2">
+    <View className="flex-1 px-2 border-r border-gray-400 last:border-0">
       <View className="mb-2 flex-row items-center gap-2">
         <FontAwesome name={metric.icon as any} size={14} color="#bfdbfe" />
         <Text className="text-xs font-semibold uppercase text-blue-100">{metric.label}</Text>
       </View>
-      <Text className="text-3xl font-bold text-white">{metric.value}</Text>
-      <Text className="text-base font-semibold text-blue-100">{metric.unit}</Text>
+      <Text className="text-lg font-bold text-white">{metric.value}</Text>
+      <Text className="text-sm font-semibold text-blue-100">{metric.unit}</Text>
     </View>
   );
 }
@@ -28,8 +28,8 @@ export function FlightHoursCard({ totalHours, metrics }: FlightHoursCardProps) {
         <FontAwesome name="plane" size={20} color="#93c5fd" />
       </View>
       <View className="mb-4 flex-row items-end">
-        <Text className="text-6xl font-extrabold text-white">{totalHours}</Text>
-        <Text className="mb-2 ml-2 text-lg font-bold text-blue-100">HRS</Text>
+        <Text className="text-5xl font-extrabold text-white">{totalHours}</Text>
+        <Text className="mb-2 ml-2 text-base font-bold text-blue-100">HRS</Text>
       </View>
       <View className="h-px bg-blue-500" />
       <View className="mt-4 flex-row justify-between">
