@@ -85,12 +85,11 @@ export default function GetStartedScreen() {
     }, 6000);
   }, []);
 
-  if (!isLoaded) return null;
-  if (isSignedIn) return <Redirect href="/(tabs)" />;
+  if (isLoaded && isSignedIn) return <Redirect href="/(tabs)" />;
 
   return (
-    <View className="flex-1 bg-slate-50 dark:bg-slate-950">
-      {/* Top Section - Brand */}
+    <View className="flex-1 flex-col flex gap-8 justify-between bg-slate-50 dark:bg-slate-950">
+      <View className="">
       <View className="px-8 pt-16 pb-6">
         <View className="items-center">
           {/* Logo Mark */}
@@ -108,7 +107,7 @@ export default function GetStartedScreen() {
       </View>
 
       {/* Carousel Section */}
-      <View className="flex-1 justify-center">
+      <View className=" justify-center">
         <ScrollView
           ref={scrollViewRef}
           horizontal
@@ -129,9 +128,8 @@ export default function GetStartedScreen() {
               isDark={isDark}
             />
           ))}
+          
         </ScrollView>
-
-        {/* Pagination Dots */}
         <View className="mt-6 flex-row justify-center items-center">
           {FEATURES.map((feature, idx) => (
             <View
@@ -145,7 +143,13 @@ export default function GetStartedScreen() {
             />
           ))}
         </View>
+
+        {/* Pagination Dots */}
+       
       </View>
+      </View>
+      {/* Top Section - Brand */}
+     
 
       {/* Bottom Section - CTA */}
       <View className="px-8 pb-12 pt-6">
@@ -214,7 +218,7 @@ function FeatureCard({
         { width: FEATURE_WIDTH, marginRight: CARD_MARGIN },
         animatedStyle,
       ]}
-      className="rounded-3xl border border-slate-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900"
+      className=" bg-white p-8 dark:bg-transparent"
     >
       {/* Icon Container */}
       <View className="h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 dark:bg-blue-950">
@@ -233,13 +237,7 @@ function FeatureCard({
         {feature.description}
       </Text>
 
-      {/* Step Indicator */}
-      <View className="mt-8 flex-row items-center gap-2">
-        <Text className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
-          Step {index + 1} of {FEATURES.length}
-        </Text>
-        <View className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-      </View>
+    
     </Animated.View>
   );
 }

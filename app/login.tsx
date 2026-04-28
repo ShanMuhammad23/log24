@@ -3,6 +3,7 @@ import { Redirect } from 'expo-router';
 import { useAuth, useSignIn, useSSO } from '@clerk/expo';
 import { useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 
 export default function LoginScreen() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -14,11 +15,7 @@ export default function LoginScreen() {
   const [loadingAction, setLoadingAction] = useState<null | 'otp-send' | 'otp-verify' | 'google' | 'apple'>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  if (!isLoaded) {
-    return null;
-  }
-
-  if (isSignedIn) {
+  if (isLoaded && isSignedIn) {
     return <Redirect href="/(tabs)" />;
   }
 
@@ -146,6 +143,7 @@ export default function LoginScreen() {
         disabled={loadingAction !== null}
         className="flex-row items-center justify-center rounded-2xl border border-zinc-300 bg-zinc-50 py-4 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900">
         {loadingAction === 'google' ? <ActivityIndicator color="#2563eb" /> : null}
+        <FontAwesome name="google" size={24} color="#2563eb" />
         <Text className="ml-2 text-base font-semibold text-zinc-900 dark:text-zinc-100">Continue with Google</Text>
       </Pressable>
 
@@ -154,6 +152,7 @@ export default function LoginScreen() {
         disabled={loadingAction !== null}
         className="mt-3 flex-row items-center justify-center rounded-2xl border border-zinc-300 bg-zinc-50 py-4 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900">
         {loadingAction === 'apple' ? <ActivityIndicator color="#111827" /> : null}
+        <FontAwesome name="apple" size={24} color="#111827" />
         <Text className="ml-2 text-base font-semibold text-zinc-900 dark:text-zinc-100">Continue with Apple</Text>
       </Pressable>
 

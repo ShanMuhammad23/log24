@@ -19,11 +19,7 @@ export default function TabLayout() {
   const colorScheme = useColorScheme();
   const { isLoaded, isSignedIn } = useAuth();
 
-  if (!isLoaded) {
-    return null;
-  }
-
-  if (!isSignedIn) {
+  if (!isLoaded || !isSignedIn) {
     return <Redirect href="/get-started" />;
   }
 

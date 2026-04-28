@@ -4,11 +4,7 @@ import { useAuth } from '@clerk/expo';
 export default function IndexRoute() {
   const { isLoaded, isSignedIn } = useAuth();
 
-  if (!isLoaded) {
-    return null;
-  }
-
-  if (isSignedIn) {
+  if (isLoaded && isSignedIn) {
     return <Redirect href="/(tabs)" />;
   }
 
