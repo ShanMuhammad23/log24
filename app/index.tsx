@@ -1,10 +1,14 @@
 import { Redirect } from 'expo-router';
-import { useAuth } from '@clerk/expo';
+import { useSupabaseSession } from '@/utils/auth';
 
 export default function IndexRoute() {
-  const { isLoaded, isSignedIn } = useAuth();
+  const { session, loading } = useSupabaseSession();
 
-  if (isLoaded && isSignedIn) {
+  if (loading) {
+    return null;
+  }
+
+  if (session) {
     return <Redirect href="/(tabs)" />;
   }
 

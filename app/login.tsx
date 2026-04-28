@@ -1,26 +1,27 @@
-import { Link } from 'expo-router';
-import { Redirect } from 'expo-router';
-import { useAuth, useSignIn, useSSO } from '@clerk/expo';
-import { useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { useSupabaseSession } from '@/utils/auth';
+import { supabase } from '@/utils/supabase';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import * as Linking from 'expo-linking';
+import { Link, Redirect } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
+import { useState } from 'react';
+import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen() {
-  const { isLoaded, isSignedIn } = useAuth();
-  const { signIn } = useSignIn();
-  const { startSSOFlow } = useSSO();
+  const { session, loading } = useSupabaseSession();
   const [emailAddress, setEmailAddress] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [loadingAction, setLoadingAction] = useState<null | 'otp-send' | 'otp-verify' | 'google' | 'apple'>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  if (isLoaded && isSignedIn) {
+  if (!loading && session) {
     return <Redirect href="/(tabs)" />;
   }
 
   const sendOtpToEmail = async () => {
-    if (!signIn) return;
     if (!emailAddress.trim()) {
       setErrorMessage('Please enter your email address.');
       return;
@@ -28,11 +29,14 @@ export default function LoginScreen() {
 
     setErrorMessage(null);
     setLoadingAction('otp-send');
-    const response = await signIn.emailCode.sendCode({ emailAddress: emailAddress.trim().toLowerCase() });
+    const { error } = await supabase.auth.signInWithOtp({
+      email: emailAddress.trim().toLowerCase(),
+      options: { shouldCreateUser: true },
+    });
     setLoadingAction(null);
 
-    if (response.error) {
-      setErrorMessage(response.error.message || 'Could not send OTP code.');
+    if (error) {
+      setErrorMessage(error.message || 'Could not send OTP code.');
       return;
     }
 
@@ -40,7 +44,6 @@ export default function LoginScreen() {
   };
 
   const verifyOtpAndLogin = async () => {
-    if (!signIn) return;
     if (!otpCode.trim()) {
       setErrorMessage('Please enter the verification code.');
       return;
@@ -49,37 +52,60 @@ export default function LoginScreen() {
     setErrorMessage(null);
     setLoadingAction('otp-verify');
 
-    const verifyResponse = await signIn.emailCode.verifyCode({ code: otpCode.trim() });
-    if (verifyResponse.error) {
+    const { error } = await supabase.auth.verifyOtp({
+      email: emailAddress.trim().toLowerCase(),
+      token: otpCode.trim(),
+      type: 'email',
+    });
+    if (error) {
       setLoadingAction(null);
-      setErrorMessage(verifyResponse.error.message || 'Invalid verification code.');
+      setErrorMessage(error.message || 'Invalid verification code.');
       return;
     }
 
-    const finalizeResponse = await signIn.finalize();
     setLoadingAction(null);
-
-    if (finalizeResponse.error) {
-      setErrorMessage(finalizeResponse.error.message || 'Could not complete sign in.');
-    }
   };
 
-  const signInWithSSO = async (strategy: 'oauth_google' | 'oauth_apple') => {
+  const signInWithOAuth = async (provider: 'google' | 'apple') => {
     setErrorMessage(null);
-    setLoadingAction(strategy === 'oauth_google' ? 'google' : 'apple');
+    setLoadingAction(provider);
+    const redirectTo = Linking.createURL('auth/callback');
 
-    try {
-      const { createdSessionId, setActive } = await startSSOFlow({ strategy });
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo,
+        skipBrowserRedirect: true,
+      },
+    });
 
-      if (createdSessionId && setActive) {
-        await setActive({ session: createdSessionId });
-      } else {
-        setErrorMessage('Authentication is incomplete. Please try again.');
-      }
-    } catch (error: any) {
-      setErrorMessage(error?.errors?.[0]?.message || error?.message || 'Sign in failed. Please try again.');
-    } finally {
+    if (error || !data?.url) {
       setLoadingAction(null);
+      setErrorMessage(error?.message || `Could not start ${provider} login.`);
+      return;
+    }
+
+    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+    if (result.type !== 'success' || !result.url) {
+      setLoadingAction(null);
+      if (result.type !== 'cancel') {
+        setErrorMessage(`${provider === 'google' ? 'Google' : 'Apple'} sign in was not completed.`);
+      }
+      return;
+    }
+
+    const url = new URL(result.url);
+    const code = url.searchParams.get('code');
+    if (!code) {
+      setLoadingAction(null);
+      setErrorMessage('Missing auth code from OAuth redirect.');
+      return;
+    }
+
+    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+    setLoadingAction(null);
+    if (exchangeError) {
+      setErrorMessage(exchangeError.message || 'Could not complete OAuth sign in.');
     }
   };
 
@@ -139,28 +165,20 @@ export default function LoginScreen() {
       </View>
 
       <Pressable
-        onPress={() => signInWithSSO('oauth_google')}
+        onPress={() => signInWithOAuth('google')}
         disabled={loadingAction !== null}
         className="flex-row items-center justify-center rounded-2xl border border-zinc-300 bg-zinc-50 py-4 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900">
-        {loadingAction === 'google' ? <ActivityIndicator color="#2563eb" /> : null}
-        <FontAwesome name="google" size={24} color="#2563eb" />
+        {loadingAction === 'google' ? <ActivityIndicator color="#2563eb" /> : <FontAwesome name="google" size={22} color="#2563eb" />}
         <Text className="ml-2 text-base font-semibold text-zinc-900 dark:text-zinc-100">Continue with Google</Text>
       </Pressable>
 
       <Pressable
-        onPress={() => signInWithSSO('oauth_apple')}
+        onPress={() => signInWithOAuth('apple')}
         disabled={loadingAction !== null}
         className="mt-3 flex-row items-center justify-center rounded-2xl border border-zinc-300 bg-zinc-50 py-4 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900">
-        {loadingAction === 'apple' ? <ActivityIndicator color="#111827" /> : null}
-        <FontAwesome name="apple" size={24} color="#111827" />
+        {loadingAction === 'apple' ? <ActivityIndicator color="#111827" /> : <FontAwesome name="apple" size={24} className='text-zinc-900 dark:text-zinc-100' color={'#ffffff'}/>}
         <Text className="ml-2 text-base font-semibold text-zinc-900 dark:text-zinc-100">Continue with Apple</Text>
       </Pressable>
-
-      {Platform.OS !== 'ios' ? (
-        <Text className="mt-2 text-center text-xs text-zinc-500 dark:text-zinc-400">
-          Apple sign in works on iOS devices.
-        </Text>
-      ) : null}
 
       {errorMessage ? (
         <Text className="mt-4 text-sm text-red-600 dark:text-red-400">{errorMessage}</Text>

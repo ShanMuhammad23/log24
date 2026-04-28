@@ -1,9 +1,9 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Link, Redirect } from 'expo-router';
-import { useAuth } from '@clerk/expo';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Dimensions, Pressable, ScrollView, Text, View, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSupabaseSession } from '@/utils/auth';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
@@ -39,7 +39,7 @@ export default function GetStartedScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
-  const { isLoaded, isSignedIn } = useAuth();
+  const { session, loading } = useSupabaseSession();
   const autoPlayRef = useRef<NodeJS.Timeout | null>(null);
 
   // Auto-slide every 4 seconds
@@ -86,7 +86,7 @@ export default function GetStartedScreen() {
     }, 6000);
   }, []);
 
-  if (isLoaded && isSignedIn) return <Redirect href="/(tabs)" />;
+  if (!loading && session) return <Redirect href="/(tabs)" />;
 
   return (
     <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-slate-50 dark:bg-slate-950">
