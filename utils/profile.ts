@@ -36,6 +36,7 @@ export type ProfileRecord = {
   email: string | null;
   full_name: string | null;
   rank: Rank | null;
+  onboarding_shown: boolean | null;
   default_operating_capacity: DefaultCapacity | null;
   organization: string | null;
   license_type: LicenseType | null;
@@ -52,6 +53,7 @@ const PROFILE_SELECT = `
   email,
   full_name,
   rank,
+  onboarding_shown,
   default_operating_capacity,
   organization,
   license_type,

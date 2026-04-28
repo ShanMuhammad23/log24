@@ -164,7 +164,12 @@ export default function ProfileEditScreen() {
     <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-slate-950">
       <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 28 }}>
         <View className="mb-5 flex-row items-center justify-between">
-          <Text className="text-2xl font-bold text-white">Edit Profile</Text>
+          <View className="flex-row items-center gap-3">
+            <Pressable onPress={() => router.back()} className="h-10 w-10 items-center justify-center rounded-full bg-slate-800">
+              <FontAwesome name="angle-left" size={18} color="#e2e8f0" />
+            </Pressable>
+            <Text className="text-2xl font-bold text-white">Edit Profile</Text>
+          </View>
           <Pressable onPress={() => router.back()} className="rounded-xl bg-slate-800 px-3 py-2 active:bg-slate-700">
             <Text className="text-sm font-semibold text-slate-100">Cancel</Text>
           </Pressable>

@@ -1,9 +1,20 @@
 -- WARNING: This schema is for context only and is not meant to be run.
 -- Table order and constraints may not be valid for execution.
 
+CREATE TABLE public.flight_attachments (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  flight_id uuid NOT NULL,
+  file_name text,
+  file_path text NOT NULL,
+  mime_type text,
+  size_bytes bigint,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT flight_attachments_pkey PRIMARY KEY (id),
+  CONSTRAINT flight_attachments_flight_id_fkey FOREIGN KEY (flight_id) REFERENCES public.flights(id)
+);
 CREATE TABLE public.flights (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
-  clerk_user_id text NOT NULL,
+  user_id uuid NOT NULL,
   flight_date date NOT NULL,
   flight_number text,
   aircraft_type text,
@@ -18,8 +29,26 @@ CREATE TABLE public.flights (
   remarks text,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  operating_capacity USER-DEFINED,
+  pic_name text,
+  co_pilot_name text,
+  out_time time without time zone,
+  in_time time without time zone,
+  total_time_minutes integer CHECK (total_time_minutes IS NULL OR total_time_minutes >= 0),
+  ifr_actual_minutes integer CHECK (ifr_actual_minutes IS NULL OR ifr_actual_minutes >= 0),
+  is_cross_country boolean NOT NULL DEFAULT false,
+  pf_takeoff_landing boolean NOT NULL DEFAULT false,
+  stl boolean NOT NULL DEFAULT false,
+  cross_country_total_minutes integer CHECK (cross_country_total_minutes IS NULL OR cross_country_total_minutes >= 0),
+  route_points text,
+  distance_nm numeric,
+  signature_url text,
+  multi_crew boolean NOT NULL DEFAULT false,
+  ulr_ops boolean NOT NULL DEFAULT false,
+  instrument_timings_minutes integer CHECK (instrument_timings_minutes IS NULL OR instrument_timings_minutes >= 0),
+  ifr_simulated_minutes integer CHECK (ifr_simulated_minutes IS NULL OR ifr_simulated_minutes >= 0),
   CONSTRAINT flights_pkey PRIMARY KEY (id),
-  CONSTRAINT flights_clerk_user_id_fkey FOREIGN KEY (clerk_user_id) REFERENCES public.profiles(clerk_user_id)
+  CONSTRAINT flights_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id)
 );
 CREATE TABLE public.payments (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -37,7 +66,6 @@ CREATE TABLE public.payments (
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT payments_pkey PRIMARY KEY (id),
-  CONSTRAINT payments_clerk_user_id_fkey FOREIGN KEY (clerk_user_id) REFERENCES public.profiles(clerk_user_id),
   CONSTRAINT payments_subscription_id_fkey FOREIGN KEY (subscription_id) REFERENCES public.subscriptions(id)
 );
 CREATE TABLE public.plans (
@@ -54,7 +82,6 @@ CREATE TABLE public.plans (
 );
 CREATE TABLE public.profiles (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
-  clerk_user_id text NOT NULL UNIQUE,
   email text,
   full_name text,
   avatar_url text,
@@ -67,6 +94,8 @@ CREATE TABLE public.profiles (
   license_type USER-DEFINED,
   license_number text CHECK (license_number IS NULL OR license_number ~ '^[A-Za-z0-9\/-]{3,32}$'::text),
   country text,
+  user_id uuid,
+  onboarding_shown boolean NOT NULL DEFAULT false,
   CONSTRAINT profiles_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.roster_imports (
@@ -80,12 +109,11 @@ CREATE TABLE public.roster_imports (
   metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT roster_imports_pkey PRIMARY KEY (id),
-  CONSTRAINT roster_imports_clerk_user_id_fkey FOREIGN KEY (clerk_user_id) REFERENCES public.profiles(clerk_user_id)
+  CONSTRAINT roster_imports_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.subscriptions (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
-  clerk_user_id text NOT NULL,
+  user_id uuid NOT NULL,
   plan_code text NOT NULL,
   status text NOT NULL CHECK (status = ANY (ARRAY['trialing'::text, 'active'::text, 'past_due'::text, 'cancelled'::text, 'expired'::text])),
   provider text NOT NULL DEFAULT 'razorpay'::text CHECK (provider = 'razorpay'::text),
@@ -97,8 +125,8 @@ CREATE TABLE public.subscriptions (
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT subscriptions_pkey PRIMARY KEY (id),
-  CONSTRAINT subscriptions_clerk_user_id_fkey FOREIGN KEY (clerk_user_id) REFERENCES public.profiles(clerk_user_id),
-  CONSTRAINT subscriptions_plan_code_fkey FOREIGN KEY (plan_code) REFERENCES public.plans(code)
+  CONSTRAINT subscriptions_plan_code_fkey FOREIGN KEY (plan_code) REFERENCES public.plans(code),
+  CONSTRAINT subscriptions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id)
 );
 CREATE TABLE public.webhook_events (
   id uuid NOT NULL DEFAULT gen_random_uuid(),

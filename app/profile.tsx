@@ -1,3 +1,4 @@
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
@@ -80,7 +81,12 @@ export default function ProfileScreen() {
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 28 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#94a3b8" />}>
         <View className="mb-5 flex-row items-center justify-between">
-          <Text className="text-2xl font-bold text-white">My Profile</Text>
+          <View className="flex-row items-center gap-3">
+            <Pressable onPress={() => router.back()} className="h-10 w-10 items-center justify-center rounded-full bg-slate-800">
+              <FontAwesome name="angle-left" size={18} color="#e2e8f0" />
+            </Pressable>
+            <Text className="text-2xl font-bold text-white">My Profile</Text>
+          </View>
           <Pressable
             onPress={() => router.push('/profile-edit')}
             className="rounded-xl bg-blue-600 px-4 py-2.5 active:bg-blue-700">

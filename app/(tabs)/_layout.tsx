@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Redirect, Tabs } from 'expo-router';
 
 import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useSupabaseSession } from '@/utils/auth';
+import { getProfile } from '@/utils/profile';
 
 // You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
 function TabBarIcon(props: {
@@ -17,11 +18,35 @@ function TabBarIcon(props: {
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const { session, loading } = useSupabaseSession();
+  const [checkingOnboarding, setCheckingOnboarding] = useState(true);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
+
+  useEffect(() => {
+    const checkOnboarding = async () => {
+      const userId = session?.user?.id;
+      if (!userId) {
+        setCheckingOnboarding(false);
+        return;
+      }
+
+      const { data } = await getProfile(userId);
+      const missingRequired = !data?.full_name || !data?.rank || !data?.organization;
+      setNeedsOnboarding(Boolean(!data?.onboarding_shown || missingRequired));
+      setCheckingOnboarding(false);
+    };
+
+    checkOnboarding();
+  }, [session?.user?.id]);
 
   if (loading) return null;
+  if (checkingOnboarding) return null;
 
   if (!session) {
     return <Redirect href="/get-started" />;
+  }
+
+  if (needsOnboarding) {
+    return <Redirect href="/onboarding" />;
   }
 
   return (

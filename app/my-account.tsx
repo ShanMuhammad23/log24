@@ -1,3 +1,4 @@
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -87,7 +88,12 @@ export default function MyAccountScreen() {
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 32 }}>
-        <Text className="mb-5 px-1 text-2xl font-bold text-white">My Account</Text>
+        <View className="mb-5 flex-row items-center gap-3">
+          <Pressable onPress={() => router.back()} className="h-10 w-10 items-center justify-center rounded-full bg-slate-800">
+            <FontAwesome name="angle-left" size={18} color="#e2e8f0" />
+          </Pressable>
+          <Text className="text-2xl font-bold text-white">My Account</Text>
+        </View>
 
         <View className="overflow-hidden rounded-2xl bg-slate-900">
           <View className="border-b border-slate-800 px-5 py-4">
