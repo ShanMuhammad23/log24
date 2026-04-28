@@ -6,7 +6,7 @@ import { supabase } from '@/utils/supabase';
 
 const SETTINGS_ITEMS = [
   { label: 'My Profile', icon: 'user', route: '/profile' },
-  { label: 'My Account', icon: 'id-card-o' },
+  { label: 'My Account', icon: 'id-card-o', route: '/my-account' },
   { label: 'Reports', icon: 'bar-chart' },
   { label: 'License and Expiries', icon: 'calendar' },
   { label: 'Settings', icon: 'cog' },
@@ -30,8 +30,8 @@ export default function MoreScreen() {
             <Pressable
               key={item.label}
               onPress={() => {
-                if (item.route) {
-                  router.push(item.route as '/profile');
+                if ('route' in item && item.route) {
+                  router.push(item.route as '/profile' | '/my-account');
                 }
               }}
               className="active:bg-slate-800"

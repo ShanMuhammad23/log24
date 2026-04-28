@@ -7,7 +7,7 @@ export function FloatingLogButton() {
       <Pressable className="h-16 w-16 items-center justify-center rounded-full bg-blue-600 shadow-lg shadow-blue-400/60">
         <FontAwesome name="plus" size={24} color="#ffffff" />
       </Pressable>
-      <Text className="mt-1 text-xs font-semibold text-blue-700">Log Flight</Text>
+      <Text className="mt-1 text-xs font-semibold text-blue-700 dark:text-blue-400">Log Flight</Text>
     </View>
   );
 }
