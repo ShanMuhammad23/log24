@@ -1,106 +1,250 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Link, Redirect } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { useState } from 'react';
-import { Dimensions, Pressable, ScrollView } from 'react-native';
-import { Text, View } from '@/components/Themed';
-import { useColorScheme } from '@/components/useColorScheme';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Dimensions, Pressable, ScrollView, Text, View, useColorScheme } from 'react-native';
+import Animated, { 
+  useSharedValue, 
+  useAnimatedStyle, 
+  withSpring,
+  interpolate,
+  Extrapolate 
+} from 'react-native-reanimated';
 
 const { width } = Dimensions.get('window');
-const FEATURE_WIDTH = width - 48;
+const FEATURE_WIDTH = width - 64;
+const CARD_MARGIN = 16;
 
 const FEATURES = [
   {
     icon: 'plane',
     title: 'Track Every Flight',
-    description: 'Log sectors, duty hours, and routes in seconds.',
+    description: 'Log sectors, duty hours, and routes in seconds with intelligent auto-fill.',
   },
   {
     icon: 'line-chart',
     title: 'Career Insights',
-    description: 'See your monthly trends and total hours at a glance.',
+    description: 'Visualize your monthly trends, total hours, and career milestones at a glance.',
   },
   {
     icon: 'calendar-check-o',
     title: 'Roster Sync',
-    description: 'Import roster data quickly and keep records updated.',
+    description: 'Import roster data seamlessly and keep your records always up to date.',
   },
 ] as const;
 
 export default function GetStartedScreen() {
   const [activeIndex, setActiveIndex] = useState(0);
+  const scrollViewRef = useRef<ScrollView>(null);
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const { isLoaded, isSignedIn } = useAuth();
+  const autoPlayRef = useRef<NodeJS.Timeout | null>(null);
 
-  if (!isLoaded) {
-    return null;
-  }
+  // Auto-slide every 4 seconds
+  useEffect(() => {
+    autoPlayRef.current = setInterval(() => {
+      setActiveIndex((prev) => {
+        const next = (prev + 1) % FEATURES.length;
+        scrollViewRef.current?.scrollTo({
+          x: next * (FEATURE_WIDTH + CARD_MARGIN),
+          animated: true,
+        });
+        return next;
+      });
+    }, 4000);
 
-  if (isSignedIn) {
-    return <Redirect href="/(tabs)" />;
-  }
+    return () => {
+      if (autoPlayRef.current) clearInterval(autoPlayRef.current);
+    };
+  }, []);
+
+  // Pause auto-play on manual scroll
+  const handleScrollBegin = useCallback(() => {
+    if (autoPlayRef.current) {
+      clearInterval(autoPlayRef.current);
+      autoPlayRef.current = null;
+    }
+  }, []);
+
+  const handleScrollEnd = useCallback((event: any) => {
+    const nextIndex = Math.round(event.nativeEvent.contentOffset.x / (FEATURE_WIDTH + CARD_MARGIN));
+    setActiveIndex(nextIndex);
+    
+    // Resume auto-play after 6 seconds of inactivity
+    if (autoPlayRef.current) clearInterval(autoPlayRef.current);
+    autoPlayRef.current = setInterval(() => {
+      setActiveIndex((prev) => {
+        const next = (prev + 1) % FEATURES.length;
+        scrollViewRef.current?.scrollTo({
+          x: next * (FEATURE_WIDTH + CARD_MARGIN),
+          animated: true,
+        });
+        return next;
+      });
+    }, 6000);
+  }, []);
+
+  if (!isLoaded) return null;
+  if (isSignedIn) return <Redirect href="/(tabs)" />;
 
   return (
-    <View className="flex-1 bg-white px-6 pt-12 dark:bg-zinc-950">
-      <View className="mb-6">
-        <Text className="text-3xl font-extrabold text-zinc-950 dark:text-zinc-50">Sign in</Text>
-        <Text className="mt-2 text-base text-zinc-600 dark:text-zinc-400">
-          Your digital pilot logbook starts here.
-        </Text>
+    <View className="flex-1 bg-slate-50 dark:bg-slate-950">
+      {/* Top Section - Brand */}
+      <View className="px-8 pt-16 pb-6">
+        <View className="items-center">
+          {/* Logo Mark */}
+          <View className="mb-4 h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 shadow-lg shadow-blue-600/25">
+            <FontAwesome name="plane" size={28} color="#ffffff" />
+          </View>
+          
+          <Text className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+            Log24
+          </Text>
+          <Text className="mt-2 text-center text-base text-slate-500 dark:text-slate-400">
+            Your digital pilot logbook starts here
+          </Text>
+        </View>
       </View>
 
-      <View className="h-[360px]">
+      {/* Carousel Section */}
+      <View className="flex-1 justify-center">
         <ScrollView
+          ref={scrollViewRef}
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
-          onMomentumScrollEnd={(event) => {
-            const nextIndex = Math.round(event.nativeEvent.contentOffset.x / FEATURE_WIDTH);
-            setActiveIndex(nextIndex);
-          }}>
-          {FEATURES.map((feature) => (
-            <View
+          onScrollBeginDrag={handleScrollBegin}
+          onMomentumScrollEnd={handleScrollEnd}
+          contentContainerStyle={{ paddingHorizontal: 32 }}
+          snapToInterval={FEATURE_WIDTH + CARD_MARGIN}
+          decelerationRate="fast"
+        >
+          {FEATURES.map((feature, index) => (
+            <FeatureCard
               key={feature.title}
-              style={{ width: FEATURE_WIDTH }}
-              className="rounded-3xl border border-zinc-200 bg-zinc-50 px-6 py-10 dark:border-zinc-800 dark:bg-zinc-900">
-              <View className="h-16 w-16 items-center justify-center rounded-2xl bg-zinc-900 dark:bg-zinc-100">
-                <FontAwesome name={feature.icon} size={26} color={isDark ? '#09090b' : '#ffffff'} />
-              </View>
-              <Text className="mt-8 text-2xl font-bold text-zinc-950 dark:text-zinc-50">{feature.title}</Text>
-              <Text className="mt-3 text-base leading-6 text-zinc-600 dark:text-zinc-400">
-                {feature.description}
-              </Text>
-            </View>
+              feature={feature}
+              index={index}
+              activeIndex={activeIndex}
+              isDark={isDark}
+            />
           ))}
         </ScrollView>
 
-        <View className="mt-5 flex-row justify-center">
+        {/* Pagination Dots */}
+        <View className="mt-6 flex-row justify-center items-center">
           {FEATURES.map((feature, idx) => (
             <View
               key={feature.title}
-              className={`mx-1.5 h-2 rounded-full ${idx === activeIndex ? 'w-6 bg-zinc-950 dark:bg-zinc-50' : 'w-2 bg-zinc-300 dark:bg-zinc-700'}`}
+              className={cn(
+                "mx-1 h-2 rounded-full transition-all duration-300",
+                idx === activeIndex 
+                  ? "w-8 bg-blue-600" 
+                  : "w-2 bg-slate-300 dark:bg-slate-700"
+              )}
             />
           ))}
         </View>
       </View>
 
-      <View className="mt-auto pb-10">
+      {/* Bottom Section - CTA */}
+      <View className="px-8 pb-12 pt-6">
         <Link href="/login" asChild>
-          <Pressable className="items-center rounded-2xl bg-zinc-950 py-4 dark:bg-zinc-50">
-            <Text className="text-base font-semibold text-zinc-50 dark:text-zinc-950">Get Started</Text>
+          <Pressable 
+            className="items-center rounded-2xl bg-blue-600 py-4 shadow-lg shadow-blue-600/25 active:scale-[0.98] transition-transform"
+            android_ripple={{ color: 'rgba(255,255,255,0.2)' }}
+          >
+            <Text className="text-base font-semibold text-white">
+              Get Started
+            </Text>
           </Pressable>
         </Link>
 
         <View className="mt-5 flex-row items-center justify-center">
-          <Text className="text-sm text-zinc-600 dark:text-zinc-400">Already have an account? </Text>
+          <Text className="text-sm text-slate-500 dark:text-slate-400">
+            Already have an account?{' '}
+          </Text>
           <Link href="/login" asChild>
             <Pressable>
-              <Text className="text-sm font-semibold text-zinc-950 underline dark:text-zinc-50">Login</Text>
+              <Text className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                Sign In
+              </Text>
             </Pressable>
           </Link>
         </View>
       </View>
     </View>
   );
+}
+
+// Feature Card Component with scale animation
+function FeatureCard({ 
+  feature, 
+  index, 
+  activeIndex, 
+  isDark 
+}: { 
+  feature: typeof FEATURES[number]; 
+  index: number; 
+  activeIndex: number;
+  isDark: boolean;
+}) {
+  const scale = useSharedValue(1);
+  
+  useEffect(() => {
+    scale.value = withSpring(index === activeIndex ? 1 : 0.92, {
+      damping: 15,
+      stiffness: 150,
+    });
+  }, [activeIndex, index]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: interpolate(
+      scale.value,
+      [0.92, 1],
+      [0.7, 1],
+      Extrapolate.CLAMP
+    ),
+  }));
+
+  return (
+    <Animated.View
+      style={[
+        { width: FEATURE_WIDTH, marginRight: CARD_MARGIN },
+        animatedStyle,
+      ]}
+      className="rounded-3xl border border-slate-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900"
+    >
+      {/* Icon Container */}
+      <View className="h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 dark:bg-blue-950">
+        <FontAwesome 
+          name={feature.icon} 
+          size={28} 
+          color={isDark ? '#60a5fa' : '#2563eb'} 
+        />
+      </View>
+
+      {/* Content */}
+      <Text className="mt-8 text-2xl font-bold text-slate-900 dark:text-white leading-tight">
+        {feature.title}
+      </Text>
+      <Text className="mt-3 text-base leading-relaxed text-slate-500 dark:text-slate-400">
+        {feature.description}
+      </Text>
+
+      {/* Step Indicator */}
+      <View className="mt-8 flex-row items-center gap-2">
+        <Text className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+          Step {index + 1} of {FEATURES.length}
+        </Text>
+        <View className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+      </View>
+    </Animated.View>
+  );
+}
+
+// Utility for className merging
+function cn(...classes: (string | false | undefined)[]) {
+  return classes.filter(Boolean).join(' ');
 }

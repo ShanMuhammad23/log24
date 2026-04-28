@@ -1,5 +1,5 @@
 import "../global.css";
-import { ClerkProvider, ClerkLoaded } from "@clerk/expo";
+import { ClerkProvider } from "@clerk/expo";
 import { Slot } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 
@@ -25,9 +25,7 @@ export default function RootLayout() {
 
   return (
     <ClerkProvider tokenCache={tokenCache} publishableKey={publishableKey}>
-      <ClerkLoaded>
-        <Slot />
-      </ClerkLoaded>
+      <Slot />
     </ClerkProvider>
   );
 }
