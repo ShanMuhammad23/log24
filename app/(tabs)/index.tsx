@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { FlightHoursCard } from '@/components/home/FlightHoursCard';
 import { FloatingLogButton } from '@/components/home/FloatingLogButton';
 import { HomeHeader } from '@/components/home/HomeHeader';
@@ -25,6 +26,10 @@ type FlightRow = {
   night_time_minutes: number | null;
 };
 
+function RecentFlightCardSkeleton() {
+  return <View className="mx-5 mb-3 h-40 rounded-2xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-900" />;
+}
+
 function formatMinutesToHours(minutes: number) {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
@@ -32,6 +37,7 @@ function formatMinutesToHours(minutes: number) {
 }
 
 export default function HomeScreen() {
+  const router = useRouter();
   const { session } = useSupabaseSession();
   const [profile, setProfile] = useState<ProfileRecord | null>(null);
   const [summaryMetrics, setSummaryMetrics] = useState<FlightMetric[]>([
@@ -42,74 +48,84 @@ export default function HomeScreen() {
   ]);
   const [recentFlights, setRecentFlights] = useState<RecentFlight[]>([]);
   const [totalHours, setTotalHours] = useState('0:00');
+  const [loadingHomeData, setLoadingHomeData] = useState(true);
 
   useEffect(() => {
     const loadHomeData = async () => {
-      const userId = session?.user?.id;
-      if (!userId) return;
-
-      const [{ data: profileData }, { data: flightsData, error: flightsError }] = await Promise.all([
-        getProfile(userId),
-        supabase
-          .from('flights')
-          .select(
-            'id, flight_date, flight_number, aircraft_type, aircraft_registration, origin_iata, destination_iata, block_time_minutes, pic_time_minutes, sic_time_minutes, night_time_minutes'
-          )
-          .eq('user_id', userId)
-          .order('flight_date', { ascending: false })
-          .limit(20),
-      ]);
-
-      if (profileData) setProfile(profileData);
-      if (flightsError || !flightsData) return;
-
-      const rows = flightsData as FlightRow[];
-      const totalBlockMinutes = rows.reduce((acc, row) => acc + (row.block_time_minutes || 0), 0);
-      const totalPicMinutes = rows.reduce((acc, row) => acc + (row.pic_time_minutes || 0), 0);
-      const totalNightMinutes = rows.reduce((acc, row) => acc + (row.night_time_minutes || 0), 0);
-      const totalDualMinutes = rows.reduce((acc, row) => acc + (row.sic_time_minutes || 0), 0);
-      const totalCrossCountryMinutes = rows.reduce((acc, row) => {
-        if (row.origin_iata && row.destination_iata && row.origin_iata !== row.destination_iata) {
-          return acc + (row.block_time_minutes || 0);
+      try {
+        const userId = session?.user?.id;
+        if (!userId) {
+          setLoadingHomeData(false);
+          return;
         }
-        return acc;
-      }, 0);
 
-      setTotalHours(formatMinutesToHours(totalBlockMinutes));
-      setSummaryMetrics([
-        { key: 'pic', label: 'PIC', value: formatMinutesToHours(totalPicMinutes), unit: 'HRS', icon: 'plane' },
-        {
-          key: 'cross-country',
-          label: 'Cross Country',
-          value: formatMinutesToHours(totalCrossCountryMinutes),
-          unit: 'HRS',
-          icon: 'globe',
-        },
-        { key: 'night', label: 'Night', value: formatMinutesToHours(totalNightMinutes), unit: 'HRS', icon: 'moon-o' },
-        { key: 'dual', label: 'Dual', value: formatMinutesToHours(totalDualMinutes), unit: 'HRS', icon: 'users' },
-      ]);
+        const [{ data: profileData }, { data: flightsData, error: flightsError }] = await Promise.all([
+          getProfile(userId),
+          supabase
+            .from('flights')
+            .select(
+              'id, flight_date, flight_number, aircraft_type, aircraft_registration, origin_iata, destination_iata, block_time_minutes, pic_time_minutes, sic_time_minutes, night_time_minutes'
+            )
+            .eq('user_id', userId)
+            .order('flight_date', { ascending: false })
+            .limit(20),
+        ]);
 
-      setRecentFlights(
-        rows.slice(0, 8).map((flight) => {
-          const date = new Date(flight.flight_date);
-          return {
-            id: flight.id,
-            day: String(date.getDate()).padStart(2, '0'),
-            month: date.toLocaleString('en-US', { month: 'short' }).toUpperCase(),
-            year: String(date.getFullYear()),
-            aircraft: flight.aircraft_type || '-',
-            aircraftTag: flight.aircraft_registration || '-',
-            routeFrom: flight.origin_iata || '-',
-            routeTo: flight.destination_iata || '-',
-            pilotName: profileData?.full_name || 'Pilot',
-            coPilotName: '-',
-            duration: formatMinutesToHours(flight.block_time_minutes || 0),
-            landings: 0,
-            takeoffs: 0,
-            goArounds: 0,
-          };
-        })
-      );
+        if (profileData) setProfile(profileData);
+        if (flightsError || !flightsData) {
+          return;
+        }
+
+        const rows = flightsData as FlightRow[];
+        const totalBlockMinutes = rows.reduce((acc, row) => acc + (row.block_time_minutes || 0), 0);
+        const totalPicMinutes = rows.reduce((acc, row) => acc + (row.pic_time_minutes || 0), 0);
+        const totalNightMinutes = rows.reduce((acc, row) => acc + (row.night_time_minutes || 0), 0);
+        const totalDualMinutes = rows.reduce((acc, row) => acc + (row.sic_time_minutes || 0), 0);
+        const totalCrossCountryMinutes = rows.reduce((acc, row) => {
+          if (row.origin_iata && row.destination_iata && row.origin_iata !== row.destination_iata) {
+            return acc + (row.block_time_minutes || 0);
+          }
+          return acc;
+        }, 0);
+
+        setTotalHours(formatMinutesToHours(totalBlockMinutes));
+        setSummaryMetrics([
+          { key: 'pic', label: 'PIC', value: formatMinutesToHours(totalPicMinutes), unit: 'HRS', icon: 'plane' },
+          {
+            key: 'cross-country',
+            label: 'Cross Country',
+            value: formatMinutesToHours(totalCrossCountryMinutes),
+            unit: 'HRS',
+            icon: 'globe',
+          },
+          { key: 'night', label: 'Night', value: formatMinutesToHours(totalNightMinutes), unit: 'HRS', icon: 'moon-o' },
+          { key: 'dual', label: 'Dual', value: formatMinutesToHours(totalDualMinutes), unit: 'HRS', icon: 'users' },
+        ]);
+
+        setRecentFlights(
+          rows.slice(0, 8).map((flight) => {
+            const date = new Date(flight.flight_date);
+            return {
+              id: flight.id,
+              day: String(date.getDate()).padStart(2, '0'),
+              month: date.toLocaleString('en-US', { month: 'short' }).toUpperCase(),
+              year: String(date.getFullYear()),
+              aircraft: flight.aircraft_type || '-',
+              aircraftTag: flight.aircraft_registration || '-',
+              routeFrom: flight.origin_iata || '-',
+              routeTo: flight.destination_iata || '-',
+              pilotName: profileData?.full_name || 'Pilot',
+              coPilotName: '-',
+              duration: formatMinutesToHours(flight.block_time_minutes || 0),
+              landings: 0,
+              takeoffs: 0,
+              goArounds: 0,
+            };
+          })
+        );
+      } finally {
+        setLoadingHomeData(false);
+      }
     };
 
     loadHomeData();
@@ -128,14 +144,24 @@ export default function HomeScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 120 }}
           className="flex-1">
-          <HomeHeader pilotName={pilotName} subtitle={subtitle} />
-          <FlightHoursCard totalHours={totalHours} metrics={summaryMetrics} />
+          <HomeHeader pilotName={pilotName} subtitle={subtitle} onProfilePress={() => router.push('/profile')} />
+          {loadingHomeData ? (
+            <View className="mx-5 h-52 rounded-3xl bg-slate-200 dark:bg-slate-800" />
+          ) : (
+            <FlightHoursCard totalHours={totalHours} metrics={summaryMetrics} />
+          )}
 
           <SectionHeader title="Recent Flights" actionLabel="View All" />
-          {recentFlights.map((flight) => (
-            <RecentFlightCard key={flight.id} flight={flight} />
-          ))}
-          {recentFlights.length === 0 ? (
+          {loadingHomeData
+            ? [1, 2, 3].map((id) => <RecentFlightCardSkeleton key={id} />)
+            : recentFlights.map((flight) => (
+                <RecentFlightCard
+                  key={flight.id}
+                  flight={flight}
+                  onPress={() => router.push(`/flight-details/${flight.id}`)}
+                />
+              ))}
+          {!loadingHomeData && recentFlights.length === 0 ? (
             <Text className="px-5 pt-2 text-sm text-slate-500 dark:text-slate-400">No flights logged yet.</Text>
           ) : null}
         </ScrollView>

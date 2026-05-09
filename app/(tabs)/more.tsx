@@ -8,7 +8,6 @@ const SETTINGS_ITEMS = [
   { label: 'My Profile', icon: 'user', route: '/profile' },
   { label: 'My Account', icon: 'id-card-o', route: '/my-account' },
   { label: 'Reports', icon: 'bar-chart' },
-  { label: 'License and Expiries', icon: 'calendar' },
   { label: 'Settings', icon: 'cog' },
   { label: 'Import/Migrate Data', icon: 'exchange' },
   { label: 'Support and Contact', icon: 'life-ring' },

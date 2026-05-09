@@ -4,9 +4,10 @@ import { Pressable, Text, View, useColorScheme } from 'react-native';
 type HomeHeaderProps = {
   pilotName: string;
   subtitle: string;
+  onProfilePress?: () => void;
 };
 
-export function HomeHeader({ pilotName, subtitle }: HomeHeaderProps) {
+export function HomeHeader({ pilotName, subtitle, onProfilePress }: HomeHeaderProps) {
   const isDark = useColorScheme() === 'dark';
 
   return (
@@ -24,7 +25,9 @@ export function HomeHeader({ pilotName, subtitle }: HomeHeaderProps) {
           <Pressable className="h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
             <FontAwesome name="bell-o" size={21} color={isDark ? '#cbd5e1' : '#1e293b'} />
           </Pressable>
-          <Pressable className="h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+          <Pressable
+            onPress={onProfilePress}
+            className="h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
             <FontAwesome name="user-o" size={21} color={isDark ? '#cbd5e1' : '#1e293b'} />
           </Pressable>
         </View>
