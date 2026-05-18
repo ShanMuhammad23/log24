@@ -4,10 +4,10 @@ import { Pressable, Text, View, useColorScheme } from 'react-native';
 type HomeHeaderProps = {
   pilotName: string;
   subtitle: string;
-  onProfilePress?: () => void;
+  onMenuPress?: () => void;
 };
 
-export function HomeHeader({ pilotName, subtitle, onProfilePress }: HomeHeaderProps) {
+export function HomeHeader({ pilotName, subtitle, onMenuPress }: HomeHeaderProps) {
   const isDark = useColorScheme() === 'dark';
 
   return (
@@ -26,9 +26,9 @@ export function HomeHeader({ pilotName, subtitle, onProfilePress }: HomeHeaderPr
             <FontAwesome name="bell-o" size={21} color={isDark ? '#cbd5e1' : '#1e293b'} />
           </Pressable>
           <Pressable
-            onPress={onProfilePress}
+            onPress={onMenuPress}
             className="h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
-            <FontAwesome name="user-o" size={21} color={isDark ? '#cbd5e1' : '#1e293b'} />
+            <FontAwesome name="bars" size={21} color={isDark ? '#cbd5e1' : '#1e293b'} />
           </Pressable>
         </View>
       </View>

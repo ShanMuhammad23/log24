@@ -7,15 +7,20 @@ type FlightHoursCardProps = {
   metrics: FlightMetric[];
 };
 
-function MetricCell({ metric }: { metric: FlightMetric }) {
+function MetricCell({ metric, showDivider }: { metric: FlightMetric; showDivider: boolean }) {
   return (
-    <View className="flex-1 px-2 border-r border-gray-400 last:border-0">
-      <View className="mb-2 flex-row items-center gap-2">
-        <FontAwesome name={metric.icon as any} size={14} color="#bfdbfe" />
-        <Text className="text-xs font-semibold uppercase text-blue-100">{metric.label}</Text>
+    <View className="flex-1 flex-row">
+      {showDivider ? <View className="mr-2 w-px self-stretch bg-blue-400/70" /> : null}
+      <View className="flex-1 px-1">
+        <View className="mb-2 flex-row items-center gap-1.5">
+          <FontAwesome name={metric.icon as any} size={13} color="#bfdbfe" />
+          <Text className="flex-1 text-[10px] font-semibold uppercase leading-tight text-blue-100" numberOfLines={2}>
+            {metric.label}
+          </Text>
+        </View>
+        <Text className="text-lg font-bold text-white">{metric.value}</Text>
+        <Text className="text-sm font-semibold text-blue-100">{metric.unit}</Text>
       </View>
-      <Text className="text-lg font-bold text-white">{metric.value}</Text>
-      <Text className="text-sm font-semibold text-blue-100">{metric.unit}</Text>
     </View>
   );
 }
@@ -32,9 +37,9 @@ export function FlightHoursCard({ totalHours, metrics }: FlightHoursCardProps) {
         <Text className="mb-2 ml-2 text-base font-bold text-blue-100">HRS</Text>
       </View>
       <View className="h-px bg-blue-500" />
-      <View className="mt-4 flex-row justify-between">
-        {metrics.map((metric) => (
-          <MetricCell key={metric.key} metric={metric} />
+      <View className="mt-4 flex-row">
+        {metrics.map((metric, index) => (
+          <MetricCell key={metric.key} metric={metric} showDivider={index > 0} />
         ))}
       </View>
     </View>

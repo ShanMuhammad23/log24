@@ -10,6 +10,7 @@ import { SectionHeader } from '@/components/home/SectionHeader';
 import { FlightMetric, RecentFlight } from '@/components/home/types';
 import { useSupabaseSession } from '@/utils/auth';
 import { getProfile, ProfileRecord, RANK_OPTIONS, toLabel } from '@/utils/profile';
+import { flightDetailsHref } from '@/utils/flight-details-navigation';
 import { supabase } from '@/utils/supabase';
 
 type FlightRow = {
@@ -144,21 +145,39 @@ export default function HomeScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 120 }}
           className="flex-1">
-          <HomeHeader pilotName={pilotName} subtitle={subtitle} onProfilePress={() => router.push('/profile')} />
+          <HomeHeader pilotName={pilotName} subtitle={subtitle} onMenuPress={() => router.push('/more')} />
           {loadingHomeData ? (
             <View className="mx-5 h-52 rounded-3xl bg-slate-200 dark:bg-slate-800" />
           ) : (
             <FlightHoursCard totalHours={totalHours} metrics={summaryMetrics} />
           )}
 
-          <SectionHeader title="Recent Flights" actionLabel="View All" />
+          <SectionHeader
+            title="Recent Flights"
+            actionLabel="View All"
+            onActionPress={() => router.push('/career')}
+          />
           {loadingHomeData
             ? [1, 2, 3].map((id) => <RecentFlightCardSkeleton key={id} />)
             : recentFlights.map((flight) => (
                 <RecentFlightCard
                   key={flight.id}
                   flight={flight}
-                  onPress={() => router.push(`/flight-details/${flight.id}`)}
+                  onPress={() =>
+                    router.push(
+                      flightDetailsHref({
+                        id: flight.id,
+                        aircraft_type: flight.aircraft,
+                        aircraft_registration: flight.aircraftTag,
+                        origin_iata: flight.routeFrom,
+                        destination_iata: flight.routeTo,
+                        block_time: flight.duration,
+                        flight_date: `${flight.day} ${flight.month} ${flight.year}`,
+                        pic_name: flight.pilotName,
+                        co_pilot_name: flight.coPilotName,
+                      })
+                    )
+                  }
                 />
               ))}
           {!loadingHomeData && recentFlights.length === 0 ? (

@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSupabaseSession } from '@/utils/auth';
+import { stageDocsReturnPreview } from '@/utils/docs-navigation';
 import { createPilotDocument } from '@/utils/documents';
 import { supabase } from '@/utils/supabase';
 
@@ -109,7 +110,14 @@ export default function AddDocumentScreen() {
       return;
     }
 
-    router.replace('/(tabs)/documents');
+    stageDocsReturnPreview({
+      user_id: userId,
+      document_type: documentType.trim(),
+      document_name: documentName.trim(),
+      expiry_date: expiryDate || null,
+      issue_date: issueDate || null,
+    });
+    router.back();
   };
 
   const pickFile = async () => {

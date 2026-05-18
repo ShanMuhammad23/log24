@@ -1,5 +1,5 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { useRouter } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/utils/supabase';
@@ -60,6 +60,7 @@ export default function MoreScreen() {
           android_ripple={{ color: 'rgba(244,63,94,0.18)' }}>
           <Text className="text-base font-semibold text-white">Logout</Text>
         </Pressable>
+        <Text className="mt-7 text-center text-sm text-slate-400">Made with ❤ by Shan Muhammad from <Link href="https://pilotshala.com" target="_blank">Pilotshala</Link></Text>
       </ScrollView>
     </SafeAreaView>
   );
