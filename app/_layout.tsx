@@ -27,6 +27,14 @@ export default function RootLayout() {
           fullScreenGestureEnabled: true,
         }}
       />
+      <Stack.Screen
+        name="document-details"
+        options={{
+          animation: 'slide_from_right',
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+        }}
+      />
     </Stack>
   );
 }

@@ -65,7 +65,7 @@ function FilterPill({
   return (
     <Pressable
       onPress={onPress}
-      className={`w-[48.5%] flex-row items-center justify-center gap-1 rounded-lg border px-2 py-2 ${
+      className={` flex-row items-center justify-center gap-1 rounded-lg  p-1 ${
         active ? 'border-blue-200 bg-blue-50' : 'border-slate-200 bg-white'
       }`}>
       <Text className={`text-sm ${active ? 'font-semibold text-blue-700' : 'font-medium text-slate-600'}`}>{label}</Text>
@@ -76,11 +76,11 @@ function FilterPill({
   );
 }
 
-function DocumentCard({ doc }: { doc: PilotDocument }) {
+function DocumentCard({ doc, onPress }: { doc: PilotDocument; onPress: () => void }) {
   const days = dayDiffFromNow(doc.expiry_date);
 
   return (
-    <View className="mb-2.5 rounded-2xl border border-slate-200 bg-white p-3">
+    <Pressable onPress={onPress} className="mb-2.5 rounded-2xl border border-slate-200 bg-white p-3 active:bg-slate-50">
       <View className="flex-row items-center">
         <View className="mr-3 h-11 w-11 items-center justify-center rounded-xl bg-blue-50">
           <FontAwesome name="id-card-o" size={20} color="#2563eb" />
@@ -113,7 +113,7 @@ function DocumentCard({ doc }: { doc: PilotDocument }) {
         <StatusBadge status={doc.status} />
         <FontAwesome name="ellipsis-v" size={14} color="#64748b" />
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -180,11 +180,8 @@ export default function DocsScreen() {
         <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 120 }}>
           <Text className="mb-4 text-center text-3xl font-bold text-slate-900">Docs</Text>
 
-          <View className="mb-3 rounded-2xl border border-slate-200 bg-[#edf2ff] p-4">
-            <View className="mb-3">
-              <View className="mb-2 h-14 w-14 items-center justify-center rounded-2xl bg-blue-600/10">
-                <FontAwesome name="folder-open" size={28} color="#2563eb" />
-              </View>
+          <View className="mb-3 rounded-2xl border border-slate-200 bg-[#edf2ff] p-4 flex-row items-center justify-between">
+            <View className="mb-3 w-2/3">
               <Text className="text-xl font-semibold text-slate-900">Keep Your Documents Up to Date</Text>
               <Text className="mt-1 text-sm text-slate-600">We'll remind you before any of your documents expire.</Text>
             </View>
@@ -210,29 +207,16 @@ export default function DocsScreen() {
             )}
           </View>
 
-          <View className="mb-3 rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-4">
-            <View className="flex-row items-center gap-3">
-              <View className="h-11 w-11 items-center justify-center rounded-full bg-blue-50">
-                <FontAwesome name="cloud-upload" size={20} color="#2563eb" />
-              </View>
-              <View className="flex-1">
-                <Text className="text-xl font-semibold text-slate-900">Upload New Document</Text>
-                <Text className="text-sm text-slate-500">JPG, PNG, PDF (Max. 10MB)</Text>
-              </View>
-            </View>
-            <Pressable onPress={() => router.push('/add-document')} className="mt-3 self-start rounded-xl bg-blue-600 px-5 py-2.5">
-              <Text className="font-semibold text-white">Upload</Text>
-            </Pressable>
-          </View>
+          
 
           {showListSkeleton ? (
             <DocsContentSkeleton />
           ) : (
             <Animated.View entering={hasLoadedOnce.current ? FadeIn.duration(220) : undefined}>
               <View className="mb-3 rounded-xl border border-slate-200 bg-white p-2">
-                <View className="flex-row flex-wrap justify-between gap-y-2">
+                <View className="flex-row  justify-between gap-y-2">
                   <FilterPill
-                    label="All Documents"
+                    label="All"
                     count={stats.total}
                     active={filterTab === 'all'}
                     onPress={() => setFilterTab('all')}
@@ -258,25 +242,22 @@ export default function DocsScreen() {
                   <Text className="text-sm text-slate-500">No documents found in this category.</Text>
                 </View>
               ) : (
-                filteredDocs.map((doc) => <DocumentCard key={doc.id} doc={doc} />)
+                filteredDocs.map((doc) => (
+                  <DocumentCard
+                    key={doc.id}
+                    doc={doc}
+                    onPress={() => {
+                      if (doc.id.startsWith('preview-')) return;
+                      router.push({
+                        pathname: '/document-details/[id]',
+                        params: { id: doc.id },
+                      });
+                    }}
+                  />
+                ))
               )}
 
-              <View className="mt-2 rounded-2xl border border-slate-200 bg-white p-4">
-                <View>
-                  <View className="flex-row items-center gap-3">
-                    <View className="h-10 w-10 items-center justify-center rounded-full bg-blue-100">
-                      <FontAwesome name="bell-o" size={18} color="#2563eb" />
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-base font-semibold text-slate-900">Smart Expiry Alerts</Text>
-                      <Text className="text-sm text-slate-600">We'll notify you 15 days before document expiry.</Text>
-                    </View>
-                  </View>
-                  <Pressable className="mt-3 self-start rounded-xl border border-slate-200 bg-slate-50 px-4 py-2">
-                    <Text className="font-medium text-blue-700">Manage Alerts</Text>
-                  </Pressable>
-                </View>
-              </View>
+              
             </Animated.View>
           )}
         </ScrollView>
