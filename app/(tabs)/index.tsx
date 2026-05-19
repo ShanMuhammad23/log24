@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -6,11 +6,14 @@ import { FlightHoursCard } from '@/components/home/FlightHoursCard';
 import { FloatingLogButton } from '@/components/home/FloatingLogButton';
 import { HomeHeader } from '@/components/home/HomeHeader';
 import { RecentFlightCard } from '@/components/home/RecentFlightCard';
+import { RecencyAlertBanner } from '@/components/home/RecencyAlertBanner';
+import { RecencyAlertModal } from '@/components/home/RecencyAlertModal';
 import { SectionHeader } from '@/components/home/SectionHeader';
 import { FlightMetric, RecentFlight } from '@/components/home/types';
 import { useSupabaseSession } from '@/utils/auth';
-import { getProfile, ProfileRecord, RANK_OPTIONS, toLabel } from '@/utils/profile';
 import { flightDetailsHref } from '@/utils/flight-details-navigation';
+import { getProfile, ProfileRecord, RANK_OPTIONS, toLabel } from '@/utils/profile';
+import { getRecencyStatus, isCplStudentPilot } from '@/utils/recency';
 import { supabase } from '@/utils/supabase';
 
 type FlightRow = {
@@ -50,6 +53,12 @@ export default function HomeScreen() {
   const [recentFlights, setRecentFlights] = useState<RecentFlight[]>([]);
   const [totalHours, setTotalHours] = useState('0:00');
   const [loadingHomeData, setLoadingHomeData] = useState(true);
+  const [lastFlightDate, setLastFlightDate] = useState<string | null>(null);
+  const [recencyModalDismissed, setRecencyModalDismissed] = useState(false);
+
+  useEffect(() => {
+    setRecencyModalDismissed(false);
+  }, [lastFlightDate]);
 
   useEffect(() => {
     const loadHomeData = async () => {
@@ -78,6 +87,7 @@ export default function HomeScreen() {
         }
 
         const rows = flightsData as FlightRow[];
+        setLastFlightDate(rows[0]?.flight_date ?? null);
         const totalBlockMinutes = rows.reduce((acc, row) => acc + (row.block_time_minutes || 0), 0);
         const totalPicMinutes = rows.reduce((acc, row) => acc + (row.pic_time_minutes || 0), 0);
         const totalNightMinutes = rows.reduce((acc, row) => acc + (row.night_time_minutes || 0), 0);
@@ -138,6 +148,14 @@ export default function HomeScreen() {
     'Pilot';
   const subtitle = toLabel(profile?.rank, RANK_OPTIONS);
 
+  const recencyStatus = useMemo(() => {
+    if (!isCplStudentPilot(profile)) return null;
+    return getRecencyStatus(lastFlightDate);
+  }, [profile, lastFlightDate]);
+
+  const showRecencyBanner = Boolean(recencyStatus?.showAlert);
+  const showRecencyModal = Boolean(recencyStatus?.showModal && !recencyModalDismissed);
+
   return (
     <SafeAreaView className="flex-1 bg-slate-50 dark:bg-slate-950">
       <View className="flex-1">
@@ -146,6 +164,9 @@ export default function HomeScreen() {
           contentContainerStyle={{ paddingBottom: 120 }}
           className="flex-1">
           <HomeHeader pilotName={pilotName} subtitle={subtitle} onMenuPress={() => router.push('/more')} />
+          {!loadingHomeData && showRecencyBanner && recencyStatus ? (
+            <RecencyAlertBanner daysRemaining={recencyStatus.daysRemaining} />
+          ) : null}
           {loadingHomeData ? (
             <View className="mx-5 h-52 rounded-3xl bg-slate-200 dark:bg-slate-800" />
           ) : (
@@ -187,6 +208,14 @@ export default function HomeScreen() {
 
         <FloatingLogButton />
       </View>
+
+      {recencyStatus ? (
+        <RecencyAlertModal
+          visible={showRecencyModal}
+          daysRemaining={recencyStatus.daysRemaining}
+          onDismiss={() => setRecencyModalDismissed(true)}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }

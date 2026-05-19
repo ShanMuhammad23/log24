@@ -132,7 +132,7 @@ export default function CareerScreen() {
   }, [rows]);
 
   return (
-    <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-slate-50">
+    <SafeAreaView edges={['top']} className="flex-1 bg-slate-50">
       <View className="flex-1">
         <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 120 }}>
           <Text className="mb-3 text-center text-3xl font-bold text-slate-900">Career</Text>

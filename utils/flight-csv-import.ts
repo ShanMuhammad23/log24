@@ -1,0 +1,557 @@
+import * as XLSX from 'xlsx';
+
+export const REQUIRED_CSV_HEADERS = [
+  'Date of Flight',
+  'Flight From',
+  'Flight To',
+  'Flight Departure Time',
+] as const;
+
+export const CSV_HEADERS = [
+  'S.No',
+  'Date of Entry',
+  'Date of Flight',
+  'Aircraft Type',
+  'Aircraft RegVT No',
+  'Engine',
+  'Pilot-in-Command',
+  'Co. pilot or student',
+  'Flight From',
+  'Flight To',
+  'Flight Departure Time',
+  'Flight Arrival Date',
+  'Flight Arrival Time',
+  'S.E-Day-Dual(1)',
+  'S.E-Day-PIC(2)',
+  'S.E-Day-Co-pilot(3)',
+  'S.E-Night-Dual(4)',
+  'S.E-Night-PIC(5)',
+  'S.E-Night-Co-pilot(6)',
+  'M.E-Day-Dual(7)',
+  'M.E-Day-PIC(8)',
+  'M.E-Day-Co-pilot(9)',
+  'M.E-Day-PI(US)(10)',
+  'M.E-Night-Dual(11)',
+  'M.E-Night-PIC(12)',
+  'M.E-Night-Co-pilot(13)',
+  'M.E-Night-PI(US)(14)',
+  'Instrument Flight Simulated(15)',
+  'Instrument Flight Actual(16)',
+  'Instructional(17)',
+  'Exercises',
+  'Cross Country',
+  'Remarks',
+  'Status',
+  'Verified By',
+  'Comment',
+] as const;
+
+export type CsvFlightRow = Record<(typeof CSV_HEADERS)[number], string>;
+
+export type FlightInsertPayload = {
+  user_id: string;
+  flight_date: string;
+  flight_number: string | null;
+  aircraft_type: string | null;
+  aircraft_registration: string | null;
+  origin_iata: string | null;
+  destination_iata: string | null;
+  out_time: string | null;
+  in_time: string | null;
+  block_time_minutes: number | null;
+  pic_time_minutes: number | null;
+  sic_time_minutes: number | null;
+  night_time_minutes: number | null;
+  instrument_time_minutes: number | null;
+  ifr_actual_minutes: number | null;
+  ifr_simulated_minutes: number | null;
+  instrument_timings_minutes: number | null;
+  cross_country_total_minutes: number | null;
+  is_cross_country: boolean;
+  pic_name: string | null;
+  co_pilot_name: string | null;
+  operating_capacity: string | null;
+  remarks: string | null;
+};
+
+export type ParsedImportRow = {
+  rowNumber: number;
+  raw: CsvFlightRow;
+  payload: FlightInsertPayload | null;
+  duplicateKey: string | null;
+  status: 'ready' | 'invalid' | 'duplicate_file' | 'duplicate_db';
+  error?: string;
+};
+
+export type ParseCsvResult = {
+  headers: string[];
+  rows: ParsedImportRow[];
+  missingHeaders: string[];
+};
+
+function normalizeHeader(header: string) {
+  return header.replace(/^\uFEFF/, '').trim();
+}
+
+function canonicalizeHeader(header: string) {
+  const trimmed = normalizeHeader(header);
+  const match = CSV_HEADERS.find((h) => h.toLowerCase() === trimmed.toLowerCase());
+  return match ?? trimmed;
+}
+
+function cellToString(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  return String(value).trim();
+}
+
+export function isSpreadsheetFileName(fileName: string) {
+  const lower = fileName.toLowerCase();
+  return lower.endsWith('.xls') || lower.endsWith('.xlsx') || lower.endsWith('.xlsm');
+}
+
+/** Parse Excel .xls / .xlsx (binary — cannot be read as plain CSV text). */
+export function parseSpreadsheetBuffer(buffer: ArrayBuffer): { headers: string[]; records: string[][] } {
+  const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+  const sheetName = workbook.SheetNames[0];
+  if (!sheetName) {
+    return { headers: [], records: [] };
+  }
+
+  const sheet = workbook.Sheets[sheetName];
+  const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+    header: 1,
+    defval: '',
+    raw: false,
+  });
+
+  const rows = matrix.map((row) => (Array.isArray(row) ? row.map(cellToString) : []));
+
+  const headerRowIndex = rows.findIndex((row) =>
+    row.some((cell) => canonicalizeHeader(cell).toLowerCase() === 'date of flight')
+  );
+  const headerIndex = headerRowIndex >= 0 ? headerRowIndex : 0;
+  const headers = rows[headerIndex]?.map((cell) => canonicalizeHeader(cell)) ?? [];
+
+  const records = rows
+    .slice(headerIndex + 1)
+    .filter((row) => row.some((cell) => cell.trim() !== ''))
+    .map((row) => {
+      const padded = [...row];
+      while (padded.length < headers.length) {
+        padded.push('');
+      }
+      return padded.slice(0, headers.length);
+    });
+
+  return { headers, records };
+}
+
+/** Minimal RFC-style CSV parser (quoted fields, commas). */
+export function parseCsvText(content: string): { headers: string[]; records: string[][] } {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < content.length; i += 1) {
+    const char = content[i];
+    const next = content[i + 1];
+
+    if (inQuotes) {
+      if (char === '"' && next === '"') {
+        field += '"';
+        i += 1;
+      } else if (char === '"') {
+        inQuotes = false;
+      } else {
+        field += char;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inQuotes = true;
+    } else if (char === ',') {
+      row.push(field);
+      field = '';
+    } else if (char === '\n' || (char === '\r' && next === '\n')) {
+      row.push(field);
+      field = '';
+      if (row.some((cell) => cell.trim() !== '')) {
+        rows.push(row);
+      }
+      row = [];
+      if (char === '\r') i += 1;
+    } else if (char !== '\r') {
+      field += char;
+    }
+  }
+
+  if (field.length > 0 || row.length > 0) {
+    row.push(field);
+    if (row.some((cell) => cell.trim() !== '')) {
+      rows.push(row);
+    }
+  }
+
+  if (rows.length === 0) {
+    return { headers: [], records: [] };
+  }
+
+  const headers = rows[0].map(canonicalizeHeader);
+  return { headers, records: rows.slice(1) };
+}
+
+function rowToRecord(headers: string[], values: string[]): CsvFlightRow {
+  const record = {} as CsvFlightRow;
+  headers.forEach((header, index) => {
+    record[header as keyof CsvFlightRow] = (values[index] ?? '').trim();
+  });
+  return record;
+}
+
+function parseDateToIso(value: string): string | null {
+  const v = value.trim();
+  if (!v) return null;
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+
+  const dmy = v.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+  if (dmy) {
+    const day = Number(dmy[1]);
+    const month = Number(dmy[2]);
+    let year = Number(dmy[3]);
+    if (year < 100) year += 2000;
+    const date = new Date(year, month - 1, day);
+    if (date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day) {
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+  }
+
+  const parsed = new Date(v);
+  if (!Number.isNaN(parsed.getTime())) {
+    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+  }
+
+  return null;
+}
+
+export function parseTimeToHHMM(value: string): string | null {
+  const v = value.trim();
+  if (!v) return null;
+
+  const hhmm = v.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (hhmm) {
+    const h = Number(hhmm[1]);
+    const m = Number(hhmm[2]);
+    if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+  }
+
+  const digits = v.match(/^(\d{3,4})$/);
+  if (digits) {
+    const raw = digits[1].padStart(4, '0');
+    const h = Number(raw.slice(0, 2));
+    const m = Number(raw.slice(2, 4));
+    if (h <= 23 && m <= 59) {
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+  }
+
+  return null;
+}
+
+function timeToMinutes(time: string): number | null {
+  const normalized = parseTimeToHHMM(time);
+  if (!normalized) return null;
+  const [h, m] = normalized.split(':').map(Number);
+  return h * 60 + m;
+}
+
+export function parseDurationToMinutes(value: string): number | null {
+  const v = value.trim();
+  if (!v) return null;
+
+  if (v.includes(':')) {
+    return timeToMinutes(v);
+  }
+
+  const num = Number(v.replace(/,/g, ''));
+  if (Number.isNaN(num) || num < 0) return null;
+
+  if (num <= 24 && String(v).includes('.')) {
+    return Math.round(num * 60);
+  }
+
+  if (num <= 24) {
+    return Math.round(num * 60);
+  }
+
+  return Math.round(num);
+}
+
+function sumDurationFields(row: CsvFlightRow, keys: (keyof CsvFlightRow)[]): number {
+  return keys.reduce((acc, key) => acc + (parseDurationToMinutes(row[key] || '') || 0), 0);
+}
+
+function blockMinutesFromTimes(
+  flightDate: string,
+  outTime: string,
+  arrivalDate: string,
+  inTime: string
+): number | null {
+  const out = timeToMinutes(outTime);
+  const input = timeToMinutes(inTime);
+  if (out === null || input === null) return null;
+
+  const dep = new Date(`${flightDate}T${parseTimeToHHMM(outTime)}:00`);
+  let arrIso = flightDate;
+  if (arrivalDate.trim()) {
+    const parsedArrDate = parseDateToIso(arrivalDate);
+    if (parsedArrDate) arrIso = parsedArrDate;
+  }
+
+  const arr = new Date(`${arrIso}T${parseTimeToHHMM(inTime)}:00`);
+  let diffMs = arr.getTime() - dep.getTime();
+  if (diffMs < 0) diffMs += 24 * 60 * 60 * 1000;
+
+  return Math.max(0, Math.round(diffMs / 60000));
+}
+
+export function buildDuplicateKey(flightDate: string, outTime: string | null) {
+  const time = outTime ? parseTimeToHHMM(outTime) ?? outTime : '00:00';
+  return `${flightDate}|${time}`;
+}
+
+function inferOperatingCapacity(row: CsvFlightRow): string | null {
+  const dual = sumDurationFields(row, [
+    'S.E-Day-Dual(1)',
+    'S.E-Night-Dual(4)',
+    'M.E-Day-Dual(7)',
+    'M.E-Night-Dual(11)',
+  ]);
+  const pic = sumDurationFields(row, [
+    'S.E-Day-PIC(2)',
+    'S.E-Night-PIC(5)',
+    'M.E-Day-PIC(8)',
+    'M.E-Night-PIC(12)',
+    'M.E-Day-PI(US)(10)',
+    'M.E-Night-PI(US)(14)',
+  ]);
+  const instructional = parseDurationToMinutes(row['Instructional(17)'] || '') || 0;
+
+  if (instructional > 0 && instructional >= dual && instructional >= pic) return 'instructor';
+  if (dual > pic && dual > 0) return 'dual';
+  if (pic > 0) return 'pic';
+  return null;
+}
+
+function buildRemarks(row: CsvFlightRow): string | null {
+  const parts: string[] = [];
+  if (row.Remarks?.trim()) parts.push(row.Remarks.trim());
+  if (row.Exercises?.trim()) parts.push(`Exercises: ${row.Exercises.trim()}`);
+  if (row.Engine?.trim()) parts.push(`Engine: ${row.Engine.trim()}`);
+  if (row['Date of Entry']?.trim()) parts.push(`Date of Entry: ${row['Date of Entry'].trim()}`);
+  if (row.Status?.trim()) parts.push(`Status: ${row.Status.trim()}`);
+  if (row['Verified By']?.trim()) parts.push(`Verified By: ${row['Verified By'].trim()}`);
+  if (row.Comment?.trim()) parts.push(`Comment: ${row.Comment.trim()}`);
+  return parts.length ? parts.join('\n') : null;
+}
+
+export function mapCsvRowToFlight(userId: string, row: CsvFlightRow): { payload: FlightInsertPayload | null; error?: string } {
+  const flightDate = parseDateToIso(row['Date of Flight'] || '');
+  if (!flightDate) {
+    return { payload: null, error: 'Invalid or missing Date of Flight.' };
+  }
+
+  const origin = (row['Flight From'] || '').trim().toUpperCase();
+  const destination = (row['Flight To'] || '').trim().toUpperCase();
+  if (!origin || !destination) {
+    return { payload: null, error: 'Flight From and Flight To are required.' };
+  }
+
+  const outTimeRaw = row['Flight Departure Time'] || '';
+  const outTime = parseTimeToHHMM(outTimeRaw);
+  if (!outTime) {
+    return { payload: null, error: 'Flight Departure Time is required for import.' };
+  }
+
+  const inTime = parseTimeToHHMM(row['Flight Arrival Time'] || '');
+
+  const picMinutes = sumDurationFields(row, [
+    'S.E-Day-PIC(2)',
+    'S.E-Night-PIC(5)',
+    'M.E-Day-PIC(8)',
+    'M.E-Night-PIC(12)',
+    'M.E-Day-PI(US)(10)',
+    'M.E-Night-PI(US)(14)',
+  ]);
+  const sicMinutes = sumDurationFields(row, [
+    'S.E-Day-Co-pilot(3)',
+    'S.E-Night-Co-pilot(6)',
+    'M.E-Day-Co-pilot(9)',
+    'M.E-Night-Co-pilot(13)',
+  ]);
+  const dualMinutes = sumDurationFields(row, [
+    'S.E-Day-Dual(1)',
+    'S.E-Night-Dual(4)',
+    'M.E-Day-Dual(7)',
+    'M.E-Night-Dual(11)',
+  ]);
+  const nightMinutes = sumDurationFields(row, [
+    'S.E-Night-Dual(4)',
+    'S.E-Night-PIC(5)',
+    'S.E-Night-Co-pilot(6)',
+    'M.E-Night-Dual(11)',
+    'M.E-Night-PIC(12)',
+    'M.E-Night-Co-pilot(13)',
+    'M.E-Night-PI(US)(14)',
+  ]);
+
+  const ifrSimulated = parseDurationToMinutes(row['Instrument Flight Simulated(15)'] || '');
+  const ifrActual = parseDurationToMinutes(row['Instrument Flight Actual(16)'] || '');
+  const instructional = parseDurationToMinutes(row['Instructional(17)'] || '');
+  const crossCountry = parseDurationToMinutes(row['Cross Country'] || '');
+
+  let blockMinutes =
+    inTime !== null
+      ? blockMinutesFromTimes(flightDate, outTime, row['Flight Arrival Date'] || '', inTime)
+      : null;
+
+  if (blockMinutes === null || blockMinutes === 0) {
+    const summed = picMinutes + sicMinutes + dualMinutes + (instructional ?? 0);
+    blockMinutes = summed > 0 ? summed : null;
+  }
+
+  const instrumentMinutes = (ifrSimulated || 0) + (ifrActual || 0);
+
+  return {
+    payload: {
+      user_id: userId,
+      flight_date: flightDate,
+      flight_number: null,
+      aircraft_type: row['Aircraft Type']?.trim() || null,
+      aircraft_registration: row['Aircraft RegVT No']?.trim() || null,
+      origin_iata: origin,
+      destination_iata: destination,
+      out_time: outTime,
+      in_time: inTime,
+      block_time_minutes: blockMinutes,
+      pic_time_minutes: picMinutes || null,
+      sic_time_minutes: sicMinutes + dualMinutes > 0 ? sicMinutes + dualMinutes : null,
+      night_time_minutes: nightMinutes || null,
+      instrument_time_minutes: instrumentMinutes || null,
+      ifr_actual_minutes: ifrActual,
+      ifr_simulated_minutes: ifrSimulated,
+      instrument_timings_minutes: instrumentMinutes || null,
+      cross_country_total_minutes: crossCountry,
+      is_cross_country: (crossCountry ?? 0) > 0,
+      pic_name: row['Pilot-in-Command']?.trim() || null,
+      co_pilot_name: row['Co. pilot or student']?.trim() || null,
+      operating_capacity: inferOperatingCapacity(row),
+      remarks: buildRemarks(row),
+    },
+  };
+}
+
+export function parseFlightRows(headers: string[], records: string[][], userId: string): ParseCsvResult {
+  const normalizedHeaders = headers.map((h) => canonicalizeHeader(h));
+  const headerSet = new Set(normalizedHeaders.map((h) => h.toLowerCase()));
+
+  const missingHeaders = REQUIRED_CSV_HEADERS.filter(
+    (required) => !headerSet.has(required.toLowerCase())
+  );
+
+  if (records.length === 0 && missingHeaders.length === 0) {
+    return { headers: normalizedHeaders, rows: [], missingHeaders: [] };
+  }
+
+  const parsed: ParsedImportRow[] = records.map((values, index) => {
+    const raw = rowToRecord(normalizedHeaders, values);
+    const rowNumber = index + 2;
+    const mapped = mapCsvRowToFlight(userId, raw);
+
+    if (!mapped.payload) {
+      return {
+        rowNumber,
+        raw,
+        payload: null,
+        duplicateKey: null,
+        status: 'invalid',
+        error: mapped.error,
+      };
+    }
+
+    const duplicateKey = buildDuplicateKey(mapped.payload.flight_date, mapped.payload.out_time);
+
+    return {
+      rowNumber,
+      raw,
+      payload: mapped.payload,
+      duplicateKey,
+      status: 'ready',
+    };
+  });
+
+  const seen = new Set<string>();
+  parsed.forEach((row) => {
+    if (row.status !== 'ready' || !row.duplicateKey) return;
+    if (seen.has(row.duplicateKey)) {
+      row.status = 'duplicate_file';
+      row.error = 'Duplicate flight date & departure time within file.';
+    } else {
+      seen.add(row.duplicateKey);
+    }
+  });
+
+  return { headers: normalizedHeaders, rows: parsed, missingHeaders };
+}
+
+export function parseFlightCsv(content: string, userId: string): ParseCsvResult {
+  const { headers, records } = parseCsvText(content);
+  return parseFlightRows(headers, records, userId);
+}
+
+export function parseFlightSpreadsheet(buffer: ArrayBuffer, userId: string): ParseCsvResult {
+  const { headers, records } = parseSpreadsheetBuffer(buffer);
+  return parseFlightRows(headers, records, userId);
+}
+
+export function parseFlightImportFile(
+  data: string | ArrayBuffer,
+  fileName: string,
+  userId: string
+): ParseCsvResult {
+  if (data instanceof ArrayBuffer || isSpreadsheetFileName(fileName)) {
+    const buffer = data instanceof ArrayBuffer ? data : new TextEncoder().encode(data as string).buffer;
+    return parseFlightSpreadsheet(buffer, userId);
+  }
+  return parseFlightCsv(typeof data === 'string' ? data : new TextDecoder().decode(data), userId);
+}
+
+export async function loadExistingDuplicateKeys(
+  userId: string,
+  fetchRows: (userId: string) => Promise<{ flight_date: string; out_time: string | null }[]>
+) {
+  const existing = await fetchRows(userId);
+  const keys = new Set<string>();
+  existing.forEach((row) => {
+    if (!row.flight_date) return;
+    keys.add(buildDuplicateKey(row.flight_date, row.out_time));
+  });
+  return keys;
+}
+
+export function markDatabaseDuplicates(rows: ParsedImportRow[], existingKeys: Set<string>) {
+  rows.forEach((row) => {
+    if (row.status !== 'ready' || !row.duplicateKey) return;
+    if (existingKeys.has(row.duplicateKey)) {
+      row.status = 'duplicate_db';
+      row.error = 'A flight with the same date and departure time already exists.';
+    }
+  });
+}

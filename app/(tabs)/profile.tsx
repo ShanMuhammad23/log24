@@ -157,10 +157,10 @@ export default function ProfileScreen() {
   const licenseType = toLabel(profile?.license_type, LICENSE_TYPE_OPTIONS);
 
   return (
-    <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-slate-50">
+    <SafeAreaView edges={['top']} className="flex-1 bg-slate-50">
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 28 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 24 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2563eb" />}>
         <View className="mb-5 flex-row items-center justify-between">
           <View className="flex-row items-center gap-3">

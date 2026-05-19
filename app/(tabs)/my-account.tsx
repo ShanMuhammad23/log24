@@ -84,7 +84,7 @@ export default function MyAccountScreen() {
     : '-';
 
   return (
-    <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-slate-950">
+    <SafeAreaView edges={['top']} className="flex-1 bg-slate-950">
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 32 }}>

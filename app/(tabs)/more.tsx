@@ -9,7 +9,7 @@ const SETTINGS_ITEMS = [
   { label: 'My Account', icon: 'id-card-o', route: '/my-account' },
   { label: 'Reports', icon: 'bar-chart' },
   { label: 'Settings', icon: 'cog' },
-  { label: 'Import/Migrate Data', icon: 'exchange' },
+  { label: 'Import/Migrate Data', icon: 'exchange', route: '/import-flights' },
   { label: 'Support and Contact', icon: 'life-ring' },
   { label: 'Review App/Feedback', icon: 'star-o' },
 ] as const;
@@ -18,11 +18,11 @@ export default function MoreScreen() {
   const router = useRouter();
 
   return (
-    <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-slate-950">
+    <SafeAreaView edges={['top']} className="flex-1 bg-slate-950">
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 32 }}>
-        <Text className="mb-5 px-1 text-2xl font-bold text-white">Settings</Text>
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 24 }}>
+        <Text className="mb-5 px-1 text-2xl font-bold text-white">Menu</Text>
 
         <View className="overflow-hidden rounded-2xl bg-slate-900">
           {SETTINGS_ITEMS.map((item, index) => (
@@ -30,7 +30,7 @@ export default function MoreScreen() {
               key={item.label}
               onPress={() => {
                 if ('route' in item && item.route) {
-                  router.push(item.route as '/profile' | '/my-account');
+                  router.push(item.route as '/profile' | '/my-account' | '/import-flights');
                 }
               }}
               className="active:bg-slate-800"

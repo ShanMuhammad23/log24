@@ -27,22 +27,6 @@ export default function RootLayout() {
           fullScreenGestureEnabled: true,
         }}
       />
-      <Stack.Screen
-        name="career"
-        options={{
-          animation: 'slide_from_right',
-          gestureEnabled: true,
-          fullScreenGestureEnabled: true,
-        }}
-      />
-      <Stack.Screen
-        name="more"
-        options={{
-          animation: 'slide_from_right',
-          gestureEnabled: true,
-          fullScreenGestureEnabled: true,
-        }}
-      />
     </Stack>
   );
 }

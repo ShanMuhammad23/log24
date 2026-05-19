@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
-import { Redirect, Tabs } from 'expo-router';
+import { Redirect, Tabs, router } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 
 import Colors from '@/constants/Colors';
@@ -12,6 +12,11 @@ import { getProfile } from '@/utils/profile';
 const HERO_BLUE = '#1d4ed8';
 const HERO_BLUE_DARK = '#0f172a';
 
+/** Routes reachable from in-app links but not shown as tab bar items. */
+const HIDDEN_TAB_OPTIONS = {
+  href: null,
+} as const;
+
 function TabBarIcon(props: {
   name: React.ComponentProps<typeof FontAwesome>['name'];
   color: string;
@@ -21,16 +26,26 @@ function TabBarIcon(props: {
 }
 
 function HomeTabBarButton(props: BottomTabBarButtonProps) {
-  const { onPress, accessibilityState, style, ...rest } = props;
+  const {
+    onPress,
+    accessibilityState,
+    accessibilityLabel,
+    accessibilityRole,
+    testID,
+    style,
+    // Default tab children (icon + label) must not be passed through — they break sibling tab labels.
+    children: _defaultTabContent,
+  } = props;
   const focused = accessibilityState?.selected;
   const color = focused ? '#ffffff' : '#bfdbfe';
 
   return (
     <Pressable
-      {...rest}
       onPress={onPress}
       accessibilityState={accessibilityState}
-      accessibilityLabel="Home"
+      accessibilityLabel={accessibilityLabel ?? 'Home'}
+      accessibilityRole={accessibilityRole}
+      testID={testID}
       style={[style, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
       <View
         style={{
@@ -97,8 +112,10 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
+        tabBarShowLabel: true,
+        tabBarLabelPosition: 'below-icon',
         tabBarActiveTintColor: isDark ? Colors.dark.tint : '#ffffff',
-        tabBarInactiveTintColor: isDark ? '#8a8a8a' : '#bfdbfe',
+        tabBarInactiveTintColor: isDark ? '#94a3b8' : '#bfdbfe',
         tabBarLabelStyle: {
           fontSize: 11,
           marginBottom: 4,
@@ -128,6 +145,8 @@ export default function TabLayout() {
         name="requirements"
         options={{
           title: 'Requirements',
+          tabBarLabel: 'Requirements',
+          tabBarShowLabel: true,
           tabBarIcon: ({ color }) => <TabBarIcon name="list-alt" color={color} />,
         }}
       />
@@ -135,6 +154,8 @@ export default function TabLayout() {
         name="docs"
         options={{
           title: 'Docs',
+          tabBarLabel: 'Docs',
+          tabBarShowLabel: true,
           tabBarIcon: ({ color }) => <TabBarIcon name="folder-open" color={color} />,
         }}
       />
@@ -142,8 +163,10 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarShowLabel: false,
+          // Do not set tabBarShowLabel: false here — React Navigation applies that flag from the
+          // focused screen to every tab, which hides all labels while Home is selected.
           tabBarIcon: () => null,
+          tabBarLabel: () => null,
           tabBarButton: (props) => <HomeTabBarButton {...props} />,
         }}
       />
@@ -151,16 +174,40 @@ export default function TabLayout() {
         name="calculation"
         options={{
           title: 'Calculation',
+          tabBarLabel: 'Calculation',
+          tabBarShowLabel: true,
           tabBarIcon: ({ color }) => <TabBarIcon name="calculator" color={color} />,
+          unmountOnBlur: true,
         }}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            const state = navigation.getState();
+            const current = state.routes[state.index];
+            if (current.name !== 'calculation') return;
+
+            const nestedIndex = current.state?.index;
+            if (typeof nestedIndex === 'number' && nestedIndex > 0) {
+              e.preventDefault();
+              router.replace('/calculation');
+            }
+          },
+        })}
       />
       <Tabs.Screen
         name="weather"
         options={{
           title: 'Weather',
+          tabBarLabel: 'Weather',
+          tabBarShowLabel: true,
           tabBarIcon: ({ color }) => <TabBarIcon name="cloud" color={color} />,
         }}
       />
+      <Tabs.Screen name="more" options={HIDDEN_TAB_OPTIONS} />
+      <Tabs.Screen name="profile" options={HIDDEN_TAB_OPTIONS} />
+      <Tabs.Screen name="profile-edit" options={HIDDEN_TAB_OPTIONS} />
+      <Tabs.Screen name="my-account" options={HIDDEN_TAB_OPTIONS} />
+      <Tabs.Screen name="career" options={HIDDEN_TAB_OPTIONS} />
+      <Tabs.Screen name="import-flights" options={HIDDEN_TAB_OPTIONS} />
     </Tabs>
   );
 }
