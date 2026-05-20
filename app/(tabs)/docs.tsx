@@ -2,13 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DocsContentSkeleton, DocsStatsSkeleton } from '@/components/docs/DocsContentSkeleton';
 import { useSupabaseSession } from '@/utils/auth';
 import { consumeDocsReturnPreview, mergeDocumentsWithPreview } from '@/utils/docs-navigation';
-import { daysUntilExpiry, fetchPilotDocuments, PilotDocument } from '@/utils/documents';
+import { daysUntilExpiry, deletePilotDocument, fetchPilotDocuments, PilotDocument } from '@/utils/documents';
 
 type FilterTab = 'all' | 'expiring_soon' | 'expired' | 'valid';
 
@@ -73,48 +73,115 @@ function FilterPill({
   );
 }
 
-function DocumentCard({ doc, onPress }: { doc: PilotDocument; onPress: () => void }) {
+function DocumentCard({
+  doc,
+  onPress,
+  onMenuPress,
+  deleting,
+}: {
+  doc: PilotDocument;
+  onPress: () => void;
+  onMenuPress: () => void;
+  deleting?: boolean;
+}) {
   const days = daysUntilExpiry(doc.expiry_date);
 
   return (
-    <Pressable
-      onPress={onPress}
-      className="mb-2.5 rounded-2xl border border-slate-200 bg-white p-3 active:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:active:bg-slate-800">
-      <View className="flex-row items-center">
-        <View className="mr-3 h-11 w-11 items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-950/60">
-          <FontAwesome name="id-card-o" size={20} color="#2563eb" />
-        </View>
+    <View className="mb-2.5 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+      <Pressable onPress={onPress} className="active:opacity-80">
+        <View className="flex-row items-center">
+          <View className="mr-3 h-11 w-11 items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-950/60">
+            <FontAwesome name="id-card-o" size={20} color="#2563eb" />
+          </View>
 
-        <View className="flex-1 pr-2">
-          <Text className="text-base font-semibold text-slate-900 dark:text-slate-100">{doc.document_name}</Text>
-          <Text className="text-sm text-slate-500 dark:text-slate-400">Uploaded on {formatDate(doc.created_at)}</Text>
-        </View>
+          <View className="flex-1 pr-2">
+            <Text className="text-base font-semibold text-slate-900 dark:text-slate-100">{doc.document_name}</Text>
+            <Text className="text-sm text-slate-500 dark:text-slate-400">Uploaded on {formatDate(doc.created_at)}</Text>
+          </View>
 
-        <View className="items-end">
-          <Text className="text-sm text-slate-500 dark:text-slate-400">
-            {doc.status === 'expired' ? 'Expired on' : 'Expires on'}
-          </Text>
-          <Text
-            className={`text-base font-semibold ${
-              doc.status === 'expired'
-                ? 'text-red-500 dark:text-red-400'
-                : doc.status === 'expiring_soon'
-                  ? 'text-amber-500 dark:text-amber-400'
-                  : 'text-emerald-600 dark:text-emerald-400'
-            }`}>
-            {formatDate(doc.expiry_date)}
-          </Text>
-          <Text className="text-xs text-slate-500 dark:text-slate-400">
-            {days === null ? '' : days < 0 ? `(${Math.abs(days)} days ago)` : `(In ${days} days)`}
-          </Text>
+          <View className="items-end">
+            <Text className="text-sm text-slate-500 dark:text-slate-400">
+              {doc.status === 'expired' ? 'Expired on' : 'Expires on'}
+            </Text>
+            <Text
+              className={`text-base font-semibold ${
+                doc.status === 'expired'
+                  ? 'text-red-500 dark:text-red-400'
+                  : doc.status === 'expiring_soon'
+                    ? 'text-amber-500 dark:text-amber-400'
+                    : 'text-emerald-600 dark:text-emerald-400'
+              }`}>
+              {formatDate(doc.expiry_date)}
+            </Text>
+            <Text className="text-xs text-slate-500 dark:text-slate-400">
+              {days === null ? '' : days < 0 ? `(${Math.abs(days)} days ago)` : `(In ${days} days)`}
+            </Text>
+          </View>
         </View>
-      </View>
+      </Pressable>
 
       <View className="mt-2 flex-row items-center justify-between">
         <StatusBadge status={doc.status} />
-        <FontAwesome name="ellipsis-v" size={14} color="#64748b" />
+        <Pressable
+          onPress={onMenuPress}
+          hitSlop={12}
+          disabled={deleting}
+          className="h-8 w-8 items-center justify-center rounded-full active:bg-slate-100 dark:active:bg-slate-800">
+          {deleting ? (
+            <ActivityIndicator size="small" color="#64748b" />
+          ) : (
+            <FontAwesome name="ellipsis-v" size={14} color="#64748b" />
+          )}
+        </Pressable>
       </View>
-    </Pressable>
+    </View>
+  );
+}
+
+function DocumentActionsModal({
+  visible,
+  documentName,
+  onClose,
+  onEdit,
+  onDelete,
+}: {
+  visible: boolean;
+  documentName: string;
+  onClose: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable className="flex-1 justify-end bg-black/40" onPress={onClose}>
+        <Pressable
+          onPress={(event) => event.stopPropagation()}
+          className="rounded-t-3xl bg-white px-4 pb-8 pt-3 dark:bg-slate-900">
+          <View className="mb-4 h-1 w-10 self-center rounded-full bg-slate-300 dark:bg-slate-600" />
+          <Text className="mb-4 text-center text-base font-semibold text-slate-900 dark:text-slate-100" numberOfLines={2}>
+            {documentName}
+          </Text>
+
+          <Pressable
+            onPress={onEdit}
+            className="mb-2 flex-row items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 active:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:active:bg-slate-700">
+            <FontAwesome name="pencil" size={18} color="#2563eb" />
+            <Text className="text-base font-semibold text-slate-900 dark:text-slate-100">Edit Document</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={onDelete}
+            className="flex-row items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3.5 active:bg-red-100 dark:border-red-900 dark:bg-red-950/40 dark:active:bg-red-950/60">
+            <FontAwesome name="trash" size={18} color="#dc2626" />
+            <Text className="text-base font-semibold text-red-600 dark:text-red-400">Delete Document</Text>
+          </Pressable>
+
+          <Pressable onPress={onClose} className="mt-3 items-center py-3">
+            <Text className="text-base font-medium text-slate-500 dark:text-slate-400">Cancel</Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -124,6 +191,8 @@ export default function DocsScreen() {
   const [documents, setDocuments] = useState<PilotDocument[]>([]);
   const [filterTab, setFilterTab] = useState<FilterTab>('all');
   const [loading, setLoading] = useState(true);
+  const [actionDoc, setActionDoc] = useState<PilotDocument | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const hasLoadedOnce = useRef(false);
 
   const loadDocuments = useCallback(
@@ -174,6 +243,37 @@ export default function DocsScreen() {
 
   const showListSkeleton = loading && documents.length === 0;
   const showStatsSkeleton = loading && documents.length === 0;
+
+  const openEdit = (doc: PilotDocument) => {
+    setActionDoc(null);
+    router.push({ pathname: '/add-document', params: { id: doc.id } });
+  };
+
+  const confirmDelete = (doc: PilotDocument) => {
+    setActionDoc(null);
+    Alert.alert('Delete Document', `Delete "${doc.document_name}"? This cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          const userId = session?.user?.id;
+          if (!userId) return;
+
+          setDeletingId(doc.id);
+          const { error } = await deletePilotDocument(userId, doc.id);
+          setDeletingId(null);
+
+          if (error) {
+            Alert.alert('Delete failed', error.message);
+            return;
+          }
+
+          setDocuments((prev) => prev.filter((item) => item.id !== doc.id));
+        },
+      },
+    ]);
+  };
 
   return (
     <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-slate-50 dark:bg-slate-950">
@@ -253,12 +353,17 @@ export default function DocsScreen() {
                   <DocumentCard
                     key={doc.id}
                     doc={doc}
+                    deleting={deletingId === doc.id}
                     onPress={() => {
                       if (doc.id.startsWith('preview-')) return;
                       router.push({
                         pathname: '/document-details/[id]',
                         params: { id: doc.id },
                       });
+                    }}
+                    onMenuPress={() => {
+                      if (doc.id.startsWith('preview-')) return;
+                      setActionDoc(doc);
                     }}
                   />
                 ))
@@ -269,7 +374,7 @@ export default function DocsScreen() {
           )}
         </ScrollView>
 
-        <View className="absolute bottom-24 right-4 items-center">
+        <View className="absolute bottom-4 right-4 items-center">
           <Pressable
             onPress={() => router.push('/add-document')}
             className="h-16 w-16 items-center justify-center rounded-full bg-blue-600 shadow-lg shadow-blue-400/60">
@@ -277,6 +382,18 @@ export default function DocsScreen() {
           </Pressable>
           <Text className="mt-1 text-xs font-semibold text-blue-700 dark:text-blue-400">Add Document</Text>
         </View>
+
+        <DocumentActionsModal
+          visible={Boolean(actionDoc)}
+          documentName={actionDoc?.document_name || ''}
+          onClose={() => setActionDoc(null)}
+          onEdit={() => {
+            if (actionDoc) openEdit(actionDoc);
+          }}
+          onDelete={() => {
+            if (actionDoc) confirmDelete(actionDoc);
+          }}
+        />
       </View>
     </SafeAreaView>
   );

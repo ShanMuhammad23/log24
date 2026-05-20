@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import { Redirect, Tabs, router } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
-import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
+import Colors from '@/constants/Colors';
 import { useSupabaseSession } from '@/utils/auth';
 import { getProfile } from '@/utils/profile';
 
@@ -177,11 +177,9 @@ export default function TabLayout() {
           tabBarLabel: 'Calculation',
           tabBarShowLabel: true,
           tabBarIcon: ({ color }) => <TabBarIcon name="calculator" color={color} />,
+          unmountOnBlur: true,
         }}
         listeners={({ navigation }) => ({
-          blur: () => {
-            router.replace('/calculation');
-          },
           tabPress: (e) => {
             const state = navigation.getState();
             const current = state.routes[state.index];

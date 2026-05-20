@@ -123,3 +123,36 @@ export function isImageMimeType(mimeType: string | null | undefined) {
 export async function createPilotDocument(payload: CreatePilotDocumentInput) {
   return supabase.from('pilot_documents').insert(payload).select('id').single();
 }
+
+export type UpdatePilotDocumentInput = {
+  document_type?: string;
+  document_name?: string;
+  issuer?: string | null;
+  issue_date?: string | null;
+  expiry_date?: string | null;
+  reminder_days_before?: number;
+  file_name?: string | null;
+  file_path?: string | null;
+  mime_type?: string | null;
+  size_bytes?: number | null;
+  notes?: string | null;
+};
+
+export async function updatePilotDocument(userId: string, documentId: string, payload: UpdatePilotDocumentInput) {
+  return supabase.from('pilot_documents').update(payload).eq('user_id', userId).eq('id', documentId);
+}
+
+export async function deletePilotDocument(userId: string, documentId: string) {
+  const { data: doc, error: fetchError } = await fetchPilotDocumentById(userId, documentId);
+  if (fetchError) return { error: fetchError };
+  if (!doc) return { error: new Error('Document not found') };
+
+  const { error: deleteError } = await supabase.from('pilot_documents').delete().eq('user_id', userId).eq('id', documentId);
+  if (deleteError) return { error: deleteError };
+
+  if (doc.file_path) {
+    await supabase.storage.from('pilot-documents').remove([doc.file_path]);
+  }
+
+  return { error: null };
+}
