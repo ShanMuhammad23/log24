@@ -1,7 +1,8 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Link, Redirect } from 'expo-router';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Dimensions, Pressable, ScrollView, Text, View, useColorScheme } from 'react-native';
+import { Dimensions, Pressable, ScrollView, Text, View } from 'react-native';
+import { useColorScheme } from '@/components/useColorScheme';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSupabaseSession } from '@/utils/auth';
 import Animated, { 

@@ -1,6 +1,5 @@
-import { useColorScheme as useNativeWindColorScheme } from 'nativewind';
+import { useAppTheme } from '@/contexts/ThemeProvider';
 
 export function useColorScheme(): 'light' | 'dark' {
-  const { colorScheme } = useNativeWindColorScheme();
-  return colorScheme === 'dark' ? 'dark' : 'light';
+  return useAppTheme().resolvedScheme;
 }
