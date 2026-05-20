@@ -47,6 +47,9 @@ CREATE TABLE public.flights (
   ulr_ops boolean NOT NULL DEFAULT false,
   instrument_timings_minutes integer CHECK (instrument_timings_minutes IS NULL OR instrument_timings_minutes >= 0),
   ifr_simulated_minutes integer CHECK (ifr_simulated_minutes IS NULL OR ifr_simulated_minutes >= 0),
+  takeoffs integer NOT NULL DEFAULT 1 CHECK (takeoffs >= 0),
+  landings integer NOT NULL DEFAULT 1 CHECK (landings >= 0),
+  go_arounds integer NOT NULL DEFAULT 0 CHECK (go_arounds >= 0),
   CONSTRAINT flights_pkey PRIMARY KEY (id),
   CONSTRAINT flights_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id)
 );

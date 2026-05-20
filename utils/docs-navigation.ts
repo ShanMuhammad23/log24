@@ -1,4 +1,4 @@
-import { PilotDocument } from '@/utils/documents';
+import { computeDocumentStatus, PilotDocument } from '@/utils/documents';
 
 let pendingReturnPreview: PilotDocument | null = null;
 
@@ -8,6 +8,7 @@ export function stageDocsReturnPreview(input: {
   document_name: string;
   expiry_date?: string | null;
   issue_date?: string | null;
+  reminder_days_before?: number;
 }) {
   pendingReturnPreview = {
     id: `preview-${Date.now()}`,
@@ -16,7 +17,7 @@ export function stageDocsReturnPreview(input: {
     document_name: input.document_name,
     expiry_date: input.expiry_date ?? null,
     issue_date: input.issue_date ?? null,
-    status: inferDocumentStatus(input.expiry_date ?? null),
+    status: computeDocumentStatus(input.expiry_date ?? null, input.reminder_days_before ?? 15),
     file_name: null,
     file_path: null,
     created_at: new Date().toISOString(),
@@ -36,14 +37,4 @@ export function mergeDocumentsWithPreview(fetched: PilotDocument[], preview: Pil
   );
   if (alreadyPresent) return fetched;
   return [preview, ...fetched];
-}
-
-export function inferDocumentStatus(expiryDate: string | null): PilotDocument['status'] {
-  if (!expiryDate) return 'valid';
-  const days = Math.floor(
-    (new Date(expiryDate).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / (1000 * 60 * 60 * 24)
-  );
-  if (days < 0) return 'expired';
-  if (days <= 15) return 'expiring_soon';
-  return 'valid';
 }

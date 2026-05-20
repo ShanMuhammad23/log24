@@ -2,6 +2,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { useColorScheme } from '@/components/useColorScheme';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FlightDetailsBodySkeleton } from '@/components/flight-details/FlightDetailsBodySkeleton';
@@ -32,6 +33,9 @@ type FlightDetailRow = {
   cross_country_total_minutes: number | null;
   instrument_timings_minutes: number | null;
   ifr_simulated_minutes: number | null;
+  takeoffs: number | null;
+  landings: number | null;
+  go_arounds: number | null;
 };
 
 function hhmmFromMinutes(minutes: number | null | undefined) {
@@ -63,7 +67,11 @@ function StatTile({ label, value, icon }: { label: string; value: string; icon: 
 }
 
 function SectionCard({ children }: { children: React.ReactNode }) {
-  return <View className="mb-3 rounded-2xl border border-slate-200 bg-white p-4">{children}</View>;
+  return (
+    <View className="mb-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+      {children}
+    </View>
+  );
 }
 
 function HeaderPlaceholder({ className }: { className?: string }) {
@@ -72,43 +80,44 @@ function HeaderPlaceholder({ className }: { className?: string }) {
 
 function FlightDetailsBody({
   flight,
-  goArounds,
   onDelete,
   deleting,
   onEdit,
 }: {
   flight: FlightDetailRow;
-  goArounds: number;
   deleting: boolean;
   onDelete: () => void;
   onEdit: () => void;
 }) {
+  const isDark = useColorScheme() === 'dark';
+  const breakdownIconColor = isDark ? '#93c5fd' : '#1e3a8a';
+
   return (
     <Animated.View entering={FadeIn.duration(220)} className="px-3 pt-3">
       <SectionCard>
         <View className="flex-row items-center">
           <View className="flex-1">
-            <Text className="text-xs font-semibold uppercase text-slate-400">From</Text>
-            <Text className="mt-1 text-3xl font-bold text-slate-800">{flight.origin_iata || '-'}</Text>
+            <Text className="text-xs font-semibold uppercase text-slate-400 dark:text-slate-500">From</Text>
+            <Text className="mt-1 text-3xl font-bold text-slate-800 dark:text-slate-100">{flight.origin_iata || '-'}</Text>
           </View>
-          <FontAwesome name="plane" size={16} color="#2563eb" />
+            <FontAwesome name="plane" size={16} color="#2563eb" />
           <View className="flex-1 items-end">
-            <Text className="text-xs font-semibold uppercase text-slate-400">To</Text>
-            <Text className="mt-1 text-3xl font-bold text-slate-800">{flight.destination_iata || '-'}</Text>
+            <Text className="text-xs font-semibold uppercase text-slate-400 dark:text-slate-500">To</Text>
+            <Text className="mt-1 text-3xl font-bold text-slate-800 dark:text-slate-100">{flight.destination_iata || '-'}</Text>
           </View>
         </View>
-        <Text className="mt-3 text-sm text-slate-500">{flight.route_points || 'Local / Circuit'}</Text>
+        <Text className="mt-3 text-sm text-slate-500 dark:text-slate-400">{flight.route_points || 'Local / Circuit'}</Text>
       </SectionCard>
 
       <SectionCard>
         <View className="flex-row gap-4">
           <View className="flex-1">
-            <Text className="text-xs font-semibold uppercase text-slate-400">Pilot (PIC)</Text>
-            <Text className="mt-1 text-lg font-semibold text-slate-800">{flight.pic_name || 'N/A'}</Text>
+            <Text className="text-xs font-semibold uppercase text-slate-400 dark:text-slate-500">Pilot (PIC)</Text>
+            <Text className="mt-1 text-lg font-semibold text-slate-800 dark:text-slate-100">{flight.pic_name || 'N/A'}</Text>
           </View>
           <View className="flex-1">
-            <Text className="text-xs font-semibold uppercase text-slate-400">Instructor</Text>
-            <Text className="mt-1 text-lg font-semibold text-slate-800">{flight.co_pilot_name || 'N/A'}</Text>
+            <Text className="text-xs font-semibold uppercase text-slate-400 dark:text-slate-500">Instructor</Text>
+            <Text className="mt-1 text-lg font-semibold text-slate-800 dark:text-slate-100">{flight.co_pilot_name || 'N/A'}</Text>
           </View>
         </View>
       </SectionCard>
@@ -116,16 +125,16 @@ function FlightDetailsBody({
       <SectionCard>
         <View className="flex-row flex-wrap justify-between gap-y-3">
           <View className="w-[32%]">
-            <Text className="text-xs font-semibold uppercase text-slate-400">Aircraft</Text>
-            <Text className="mt-1 text-base font-bold text-slate-800">{flight.aircraft_type || '-'}</Text>
+            <Text className="text-xs font-semibold uppercase text-slate-400 dark:text-slate-500">Aircraft</Text>
+            <Text className="mt-1 text-base font-bold text-slate-800 dark:text-slate-100">{flight.aircraft_type || '-'}</Text>
           </View>
           <View className="w-[32%]">
-            <Text className="text-xs font-semibold uppercase text-slate-400">Registration</Text>
-            <Text className="mt-1 text-base font-bold text-slate-800">{flight.aircraft_registration || '-'}</Text>
+            <Text className="text-xs font-semibold uppercase text-slate-400 dark:text-slate-500">Registration</Text>
+            <Text className="mt-1 text-base font-bold text-slate-800 dark:text-slate-100">{flight.aircraft_registration || '-'}</Text>
           </View>
           <View className="w-[32%]">
-            <Text className="text-xs font-semibold uppercase text-slate-400">Hobbs</Text>
-            <Text className="mt-1 text-base font-bold text-slate-800">
+            <Text className="text-xs font-semibold uppercase text-slate-400 dark:text-slate-500">Hobbs</Text>
+            <Text className="mt-1 text-base font-bold text-slate-800 dark:text-slate-100">
               {formatTimeOnly(flight.out_time)} - {formatTimeOnly(flight.in_time)}
             </Text>
           </View>
@@ -133,7 +142,7 @@ function FlightDetailsBody({
       </SectionCard>
 
       <SectionCard>
-        <Text className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">Flight Breakdown</Text>
+        <Text className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Flight Breakdown</Text>
         <View className="flex-row flex-wrap">
           {[
             { label: 'PIC', value: hhmmFromMinutes(flight.pic_time_minutes), icon: 'plane' as const },
@@ -150,29 +159,29 @@ function FlightDetailsBody({
               icon: 'clock-o' as const,
             },
           ].map((item) => (
-            <View key={item.label} className="w-1/5 items-center border-r border-slate-200 px-1 last:border-r-0">
-              <FontAwesome name={item.icon} size={15} color="#1e3a8a" />
-              <Text className="mt-2 text-center text-[11px] font-semibold uppercase text-slate-500">{item.label}</Text>
-              <Text className="mt-1 text-sm font-bold text-slate-800">{item.value}</Text>
-              <Text className="text-[10px] text-slate-500">HRS</Text>
+            <View key={item.label} className="w-1/5 items-center border-r border-slate-200 px-1 last:border-r-0 dark:border-slate-700">
+              <FontAwesome name={item.icon} size={15} color={breakdownIconColor} />
+              <Text className="mt-2 text-center text-[11px] font-semibold uppercase text-slate-500 dark:text-slate-400">{item.label}</Text>
+              <Text className="mt-1 text-sm font-bold text-slate-800 dark:text-slate-100">{item.value}</Text>
+              <Text className="text-[10px] text-slate-500 dark:text-slate-400">HRS</Text>
             </View>
           ))}
         </View>
       </SectionCard>
 
       <SectionCard>
-        <Text className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500">Remarks / Notes</Text>
-        <Text className="text-sm text-slate-700">{flight.remarks || 'No remarks added.'}</Text>
+        <Text className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Remarks / Notes</Text>
+        <Text className="text-sm text-slate-700 dark:text-slate-300">{flight.remarks || 'No remarks added.'}</Text>
       </SectionCard>
 
       <SectionCard>
         <View className="flex-row items-center justify-between">
           <View>
-            <Text className="text-sm font-bold uppercase tracking-wide text-slate-500">Attachments</Text>
-            <Text className="mt-1 text-sm text-slate-700">No attachments added</Text>
+            <Text className="text-sm font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Attachments</Text>
+            <Text className="mt-1 text-sm text-slate-700 dark:text-slate-300">No attachments added</Text>
           </View>
-          <Pressable className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2">
-            <Text className="font-semibold text-blue-700">Upload</Text>
+          <Pressable className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 dark:border-blue-800 dark:bg-blue-950/50">
+            <Text className="font-semibold text-blue-700 dark:text-blue-300">Upload</Text>
           </Pressable>
         </View>
       </SectionCard>
@@ -184,8 +193,8 @@ function FlightDetailsBody({
         <Pressable
           onPress={onDelete}
           disabled={deleting}
-          className="flex-1 items-center rounded-xl border border-red-200 bg-white py-3">
-          <Text className="font-semibold text-red-600">{deleting ? 'Deleting...' : 'Delete Flight'}</Text>
+          className="flex-1 items-center rounded-xl border border-red-200 bg-white py-3 dark:border-red-900/50 dark:bg-slate-900">
+          <Text className="font-semibold text-red-600 dark:text-red-400">{deleting ? 'Deleting...' : 'Delete Flight'}</Text>
         </Pressable>
       </View>
     </Animated.View>
@@ -222,7 +231,7 @@ export default function FlightDetailsScreen() {
       const { data } = await supabase
         .from('flights')
         .select(
-          'id, flight_date, flight_number, aircraft_type, aircraft_registration, origin_iata, destination_iata, block_time_minutes, pic_time_minutes, sic_time_minutes, night_time_minutes, instrument_time_minutes, remarks, pic_name, co_pilot_name, out_time, in_time, route_points, ifr_actual_minutes, cross_country_total_minutes, instrument_timings_minutes, ifr_simulated_minutes'
+          'id, flight_date, flight_number, aircraft_type, aircraft_registration, origin_iata, destination_iata, block_time_minutes, pic_time_minutes, sic_time_minutes, night_time_minutes, instrument_time_minutes, remarks, pic_name, co_pilot_name, out_time, in_time, route_points, ifr_actual_minutes, cross_country_total_minutes, instrument_timings_minutes, ifr_simulated_minutes, takeoffs, landings, go_arounds'
         )
         .eq('id', id)
         .eq('user_id', userId)
@@ -242,7 +251,9 @@ export default function FlightDetailsScreen() {
     };
   }, [id, session?.user?.id]);
 
-  const goArounds = useMemo(() => (flight?.remarks || '').toLowerCase().includes('go-around') ? 1 : 0, [flight?.remarks]);
+  const takeoffCount = flight?.takeoffs ?? 0;
+  const landingCount = flight?.landings ?? 0;
+  const goAroundCount = flight?.go_arounds ?? 0;
 
   const headerAircraft = flight?.aircraft_type ?? preview.aircraft_type ?? '';
   const headerRegistration = flight?.aircraft_registration ?? preview.aircraft_registration ?? '';
@@ -251,6 +262,11 @@ export default function FlightDetailsScreen() {
     ? hhmmFromMinutes(flight.block_time_minutes)
     : preview.block_time || (loading ? '00:00' : '00:00');
   const headerNight = flight ? hhmmFromMinutes(flight.night_time_minutes) : loading && !hasPreview ? '—' : '00:00';
+
+  const goToEdit = () => {
+    if (!flight) return;
+    router.push({ pathname: '/add-flight', params: { id: flight.id } });
+  };
 
   const handleDelete = () => {
     if (!flight) return;
@@ -272,9 +288,9 @@ export default function FlightDetailsScreen() {
 
   if (!loading && !flight) {
     return (
-      <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-slate-100">
+      <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-slate-100 dark:bg-slate-950">
         <View className="flex-1 items-center justify-center px-6">
-          <Text className="text-base text-slate-600">Flight not found.</Text>
+          <Text className="text-base text-slate-600 dark:text-slate-400">Flight not found.</Text>
           <Pressable onPress={() => router.back()} className="mt-4 rounded-xl bg-blue-600 px-5 py-3">
             <Text className="font-semibold text-white">Go Back</Text>
           </Pressable>
@@ -286,7 +302,7 @@ export default function FlightDetailsScreen() {
   const showBodySkeleton = loading && !flight;
 
   return (
-    <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-slate-100">
+    <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-slate-100 dark:bg-slate-950">
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 24 }}>
         <View className="rounded-b-3xl bg-blue-700 px-4 pb-4 pt-3">
           <View className="mb-2 flex-row items-center justify-between">
@@ -309,7 +325,7 @@ export default function FlightDetailsScreen() {
               )}
             </View>
             <Pressable
-              onPress={() => flight && router.push('/add-flight')}
+              onPress={goToEdit}
               disabled={!flight}
               className="h-9 w-9 items-center justify-center rounded-full bg-blue-800/40">
               <FontAwesome name="pencil" size={14} color="#ffffff" />
@@ -329,9 +345,9 @@ export default function FlightDetailsScreen() {
               )}
             </View>
             <View className="mt-4 flex-row">
-              <StatTile label="Takeoffs" value="1" icon="send-o" />
-              <StatTile label="Landings" value="1" icon="fighter-jet" />
-              <StatTile label="Go Around" value={flight ? String(goArounds) : '0'} icon="wrench" />
+              <StatTile label="Takeoffs" value={String(takeoffCount)} icon="send-o" />
+              <StatTile label="Landings" value={String(landingCount)} icon="fighter-jet" />
+              <StatTile label="Go Around" value={String(goAroundCount)} icon="wrench" />
               <StatTile label="Night" value={headerNight} icon="moon-o" />
             </View>
           </View>
@@ -342,10 +358,9 @@ export default function FlightDetailsScreen() {
         ) : flight ? (
           <FlightDetailsBody
             flight={flight}
-            goArounds={goArounds}
             deleting={deleting}
             onDelete={handleDelete}
-            onEdit={() => router.push('/add-flight')}
+            onEdit={goToEdit}
           />
         ) : null}
       </ScrollView>

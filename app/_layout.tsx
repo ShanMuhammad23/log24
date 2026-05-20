@@ -1,14 +1,16 @@
 import '../global.css';
 import { Stack } from 'expo-router';
+import { ThemeProvider } from '@/contexts/ThemeProvider';
 
 export default function RootLayout() {
   return (
+    <ThemeProvider>
     <Stack
       screenOptions={{
         headerShown: false,
         animation: 'slide_from_right',
         gestureEnabled: true,
-        contentStyle: { backgroundColor: '#f1f5f9' },
+        contentStyle: { backgroundColor: '#f8fafc' },
       }}>
       <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
       <Stack.Screen
@@ -36,5 +38,6 @@ export default function RootLayout() {
         }}
       />
     </Stack>
+    </ThemeProvider>
   );
 }

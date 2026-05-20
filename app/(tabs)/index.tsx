@@ -13,6 +13,7 @@ import { FlightMetric, RecentFlight } from '@/components/home/types';
 import { useSupabaseSession } from '@/utils/auth';
 import { flightDetailsHref } from '@/utils/flight-details-navigation';
 import { getProfile, ProfileRecord, RANK_OPTIONS, toLabel } from '@/utils/profile';
+import { aggregateFlightTotals, fetchCareerTotals, FlightTotalsRow } from '@/utils/career';
 import { getRecencyStatus, isCplStudentPilot } from '@/utils/recency';
 import { supabase } from '@/utils/supabase';
 
@@ -24,6 +25,11 @@ type FlightRow = {
   aircraft_registration: string | null;
   origin_iata: string | null;
   destination_iata: string | null;
+  pic_name: string | null;
+  co_pilot_name: string | null;
+  takeoffs: number | null;
+  landings: number | null;
+  go_arounds: number | null;
   block_time_minutes: number | null;
   pic_time_minutes: number | null;
   sic_time_minutes: number | null;
@@ -69,49 +75,43 @@ export default function HomeScreen() {
           return;
         }
 
-        const [{ data: profileData }, { data: flightsData, error: flightsError }] = await Promise.all([
-          getProfile(userId),
-          supabase
-            .from('flights')
-            .select(
-              'id, flight_date, flight_number, aircraft_type, aircraft_registration, origin_iata, destination_iata, block_time_minutes, pic_time_minutes, sic_time_minutes, night_time_minutes'
-            )
-            .eq('user_id', userId)
-            .order('flight_date', { ascending: false })
-            .limit(20),
-        ]);
+        const [{ data: profileData }, { data: flightsData, error: flightsError }, { data: totalsData }] =
+          await Promise.all([
+            getProfile(userId),
+            supabase
+              .from('flights')
+              .select(
+                'id, flight_date, flight_number, aircraft_type, aircraft_registration, origin_iata, destination_iata, pic_name, co_pilot_name, takeoffs, landings, go_arounds, block_time_minutes, pic_time_minutes, sic_time_minutes, night_time_minutes'
+              )
+              .eq('user_id', userId)
+              .order('flight_date', { ascending: false })
+              .limit(20),
+            fetchCareerTotals(userId),
+          ]);
 
         if (profileData) setProfile(profileData);
+
+        const totals = aggregateFlightTotals((totalsData || []) as FlightTotalsRow[]);
+        setTotalHours(formatMinutesToHours(totals.total));
+        setSummaryMetrics([
+          { key: 'pic', label: 'PIC', value: formatMinutesToHours(totals.pic), unit: 'HRS', icon: 'plane' },
+          {
+            key: 'cross-country',
+            label: 'Cross Country',
+            value: formatMinutesToHours(totals.crossCountry),
+            unit: 'HRS',
+            icon: 'globe',
+          },
+          { key: 'night', label: 'Night', value: formatMinutesToHours(totals.night), unit: 'HRS', icon: 'moon-o' },
+          { key: 'dual', label: 'Dual', value: formatMinutesToHours(totals.dual), unit: 'HRS', icon: 'users' },
+        ]);
+
         if (flightsError || !flightsData) {
           return;
         }
 
         const rows = flightsData as FlightRow[];
         setLastFlightDate(rows[0]?.flight_date ?? null);
-        const totalBlockMinutes = rows.reduce((acc, row) => acc + (row.block_time_minutes || 0), 0);
-        const totalPicMinutes = rows.reduce((acc, row) => acc + (row.pic_time_minutes || 0), 0);
-        const totalNightMinutes = rows.reduce((acc, row) => acc + (row.night_time_minutes || 0), 0);
-        const totalDualMinutes = rows.reduce((acc, row) => acc + (row.sic_time_minutes || 0), 0);
-        const totalCrossCountryMinutes = rows.reduce((acc, row) => {
-          if (row.origin_iata && row.destination_iata && row.origin_iata !== row.destination_iata) {
-            return acc + (row.block_time_minutes || 0);
-          }
-          return acc;
-        }, 0);
-
-        setTotalHours(formatMinutesToHours(totalBlockMinutes));
-        setSummaryMetrics([
-          { key: 'pic', label: 'PIC', value: formatMinutesToHours(totalPicMinutes), unit: 'HRS', icon: 'plane' },
-          {
-            key: 'cross-country',
-            label: 'Cross Country',
-            value: formatMinutesToHours(totalCrossCountryMinutes),
-            unit: 'HRS',
-            icon: 'globe',
-          },
-          { key: 'night', label: 'Night', value: formatMinutesToHours(totalNightMinutes), unit: 'HRS', icon: 'moon-o' },
-          { key: 'dual', label: 'Dual', value: formatMinutesToHours(totalDualMinutes), unit: 'HRS', icon: 'users' },
-        ]);
 
         setRecentFlights(
           rows.slice(0, 8).map((flight) => {
@@ -125,12 +125,12 @@ export default function HomeScreen() {
               aircraftTag: flight.aircraft_registration || '-',
               routeFrom: flight.origin_iata || '-',
               routeTo: flight.destination_iata || '-',
-              pilotName: profileData?.full_name || 'Pilot',
-              coPilotName: '-',
+              pilotName: flight.pic_name || profileData?.full_name || 'Pilot',
+              coPilotName: flight.co_pilot_name || '-',
               duration: formatMinutesToHours(flight.block_time_minutes || 0),
-              landings: 0,
-              takeoffs: 0,
-              goArounds: 0,
+              landings: flight.landings ?? 0,
+              takeoffs: flight.takeoffs ?? 0,
+              goArounds: flight.go_arounds ?? 0,
             };
           })
         );
@@ -188,14 +188,14 @@ export default function HomeScreen() {
                     router.push(
                       flightDetailsHref({
                         id: flight.id,
-                        aircraft_type: flight.aircraft,
-                        aircraft_registration: flight.aircraftTag,
-                        origin_iata: flight.routeFrom,
-                        destination_iata: flight.routeTo,
+                        aircraft_type: flight.aircraft !== '-' ? flight.aircraft : undefined,
+                        aircraft_registration: flight.aircraftTag !== '-' ? flight.aircraftTag : undefined,
+                        origin_iata: flight.routeFrom !== '-' ? flight.routeFrom : undefined,
+                        destination_iata: flight.routeTo !== '-' ? flight.routeTo : undefined,
                         block_time: flight.duration,
                         flight_date: `${flight.day} ${flight.month} ${flight.year}`,
-                        pic_name: flight.pilotName,
-                        co_pilot_name: flight.coPilotName,
+                        pic_name: flight.pilotName !== 'Pilot' ? flight.pilotName : undefined,
+                        co_pilot_name: flight.coPilotName !== '-' ? flight.coPilotName : undefined,
                       })
                     )
                   }

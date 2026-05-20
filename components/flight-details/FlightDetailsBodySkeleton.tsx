@@ -1,11 +1,15 @@
 import { View } from 'react-native';
 
 function SkeletonBlock({ className }: { className?: string }) {
-  return <View className={`rounded-lg bg-slate-200 ${className ?? ''}`} />;
+  return <View className={`rounded-lg bg-slate-200 dark:bg-slate-800 ${className ?? ''}`} />;
 }
 
 function SectionCardSkeleton({ children }: { children: React.ReactNode }) {
-  return <View className="mb-3 rounded-2xl border border-slate-200 bg-white p-4">{children}</View>;
+  return (
+    <View className="mb-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+      {children}
+    </View>
+  );
 }
 
 export function FlightDetailsBodySkeleton() {

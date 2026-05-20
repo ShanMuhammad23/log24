@@ -8,19 +8,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { DocsContentSkeleton, DocsStatsSkeleton } from '@/components/docs/DocsContentSkeleton';
 import { useSupabaseSession } from '@/utils/auth';
 import { consumeDocsReturnPreview, mergeDocumentsWithPreview } from '@/utils/docs-navigation';
-import { fetchPilotDocuments, PilotDocument } from '@/utils/documents';
+import { daysUntilExpiry, fetchPilotDocuments, PilotDocument } from '@/utils/documents';
 
 type FilterTab = 'all' | 'expiring_soon' | 'expired' | 'valid';
-
-function dayDiffFromNow(dateValue: string | null) {
-  if (!dateValue) return null;
-  const now = new Date();
-  const expiry = new Date(dateValue);
-  now.setHours(0, 0, 0, 0);
-  expiry.setHours(0, 0, 0, 0);
-  const ms = expiry.getTime() - now.getTime();
-  return Math.floor(ms / (1000 * 60 * 60 * 24));
-}
 
 function formatDate(value: string | null) {
   if (!value) return 'N/A';
@@ -32,21 +22,21 @@ function formatDate(value: string | null) {
 function StatusBadge({ status }: { status: PilotDocument['status'] }) {
   if (status === 'expired') {
     return (
-      <View className="rounded-full bg-red-100 px-3 py-1">
-        <Text className="text-xs font-medium text-red-600">Expired</Text>
+      <View className="rounded-full bg-red-100 px-3 py-1 dark:bg-red-950/60">
+        <Text className="text-xs font-medium text-red-600 dark:text-red-400">Expired</Text>
       </View>
     );
   }
   if (status === 'expiring_soon') {
     return (
-      <View className="rounded-full bg-amber-100 px-3 py-1">
-        <Text className="text-xs font-medium text-amber-600">Expiring Soon</Text>
+      <View className="rounded-full bg-amber-100 px-3 py-1 dark:bg-amber-950/60">
+        <Text className="text-xs font-medium text-amber-600 dark:text-amber-400">Expiring Soon</Text>
       </View>
     );
   }
   return (
-    <View className="rounded-full bg-emerald-100 px-3 py-1">
-      <Text className="text-xs font-medium text-emerald-600">Valid</Text>
+    <View className="rounded-full bg-emerald-100 px-3 py-1 dark:bg-emerald-950/60">
+      <Text className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Valid</Text>
     </View>
   );
 }
@@ -65,45 +55,56 @@ function FilterPill({
   return (
     <Pressable
       onPress={onPress}
-      className={` flex-row items-center justify-center gap-1 rounded-lg  p-1 ${
-        active ? 'border-blue-200 bg-blue-50' : 'border-slate-200 bg-white'
+      className={`flex-row items-center justify-center gap-1 rounded-lg p-1 ${
+        active
+          ? 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/50'
+          : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'
       }`}>
-      <Text className={`text-sm ${active ? 'font-semibold text-blue-700' : 'font-medium text-slate-600'}`}>{label}</Text>
-      <View className="rounded-full bg-slate-100 px-2">
-        <Text className={`text-xs ${active ? 'text-blue-700' : 'text-slate-600'}`}>{count}</Text>
+      <Text
+        className={`text-sm ${active ? 'font-semibold text-blue-700 dark:text-blue-300' : 'font-medium text-slate-600 dark:text-slate-300'}`}>
+        {label}
+      </Text>
+      <View className="rounded-full bg-slate-100 px-2 dark:bg-slate-800">
+        <Text className={`text-xs ${active ? 'text-blue-700 dark:text-blue-300' : 'text-slate-600 dark:text-slate-300'}`}>
+          {count}
+        </Text>
       </View>
     </Pressable>
   );
 }
 
 function DocumentCard({ doc, onPress }: { doc: PilotDocument; onPress: () => void }) {
-  const days = dayDiffFromNow(doc.expiry_date);
+  const days = daysUntilExpiry(doc.expiry_date);
 
   return (
-    <Pressable onPress={onPress} className="mb-2.5 rounded-2xl border border-slate-200 bg-white p-3 active:bg-slate-50">
+    <Pressable
+      onPress={onPress}
+      className="mb-2.5 rounded-2xl border border-slate-200 bg-white p-3 active:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:active:bg-slate-800">
       <View className="flex-row items-center">
-        <View className="mr-3 h-11 w-11 items-center justify-center rounded-xl bg-blue-50">
+        <View className="mr-3 h-11 w-11 items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-950/60">
           <FontAwesome name="id-card-o" size={20} color="#2563eb" />
         </View>
 
         <View className="flex-1 pr-2">
-          <Text className="text-base font-semibold text-slate-900">{doc.document_name}</Text>
-          <Text className="text-sm text-slate-500">Uploaded on {formatDate(doc.created_at)}</Text>
+          <Text className="text-base font-semibold text-slate-900 dark:text-slate-100">{doc.document_name}</Text>
+          <Text className="text-sm text-slate-500 dark:text-slate-400">Uploaded on {formatDate(doc.created_at)}</Text>
         </View>
 
         <View className="items-end">
-          <Text className="text-sm text-slate-500">{doc.status === 'expired' ? 'Expired on' : 'Expires on'}</Text>
+          <Text className="text-sm text-slate-500 dark:text-slate-400">
+            {doc.status === 'expired' ? 'Expired on' : 'Expires on'}
+          </Text>
           <Text
             className={`text-base font-semibold ${
               doc.status === 'expired'
-                ? 'text-red-500'
+                ? 'text-red-500 dark:text-red-400'
                 : doc.status === 'expiring_soon'
-                  ? 'text-amber-500'
-                  : 'text-emerald-600'
+                  ? 'text-amber-500 dark:text-amber-400'
+                  : 'text-emerald-600 dark:text-emerald-400'
             }`}>
             {formatDate(doc.expiry_date)}
           </Text>
-          <Text className="text-xs text-slate-500">
+          <Text className="text-xs text-slate-500 dark:text-slate-400">
             {days === null ? '' : days < 0 ? `(${Math.abs(days)} days ago)` : `(In ${days} days)`}
           </Text>
         </View>
@@ -175,33 +176,39 @@ export default function DocsScreen() {
   const showStatsSkeleton = loading && documents.length === 0;
 
   return (
-    <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-slate-50">
+    <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-slate-50 dark:bg-slate-950">
       <View className="flex-1">
         <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 120 }}>
-          <Text className="mb-4 text-center text-3xl font-bold text-slate-900">Docs</Text>
+          <Text className="mb-4 text-center text-3xl font-bold text-slate-900 dark:text-slate-100">Docs</Text>
 
-          <View className="mb-3 rounded-2xl border border-slate-200 bg-[#edf2ff] p-4 flex-row items-center justify-between">
+          <View className="mb-3 flex-row items-center justify-between rounded-2xl border border-slate-200 bg-[#edf2ff] p-4 dark:border-slate-700 dark:bg-blue-950/40">
             <View className="mb-3 w-2/3">
-              <Text className="text-xl font-semibold text-slate-900">Keep Your Documents Up to Date</Text>
-              <Text className="mt-1 text-sm text-slate-600">We'll remind you before any of your documents expire.</Text>
+              <Text className="text-xl font-semibold text-slate-900 dark:text-slate-100">Keep Your Documents Up to Date</Text>
+              <Text className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                We'll remind you before any of your documents expire.
+              </Text>
             </View>
             {showStatsSkeleton ? (
               <DocsStatsSkeleton />
             ) : (
-              <View className="rounded-xl border border-blue-100 bg-white p-3">
+              <View className="rounded-xl border border-blue-100 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
                 <View className="mb-2 flex-row items-center gap-2">
                   <FontAwesome name="file-text" size={14} color="#2563eb" />
-                  <Text className="text-sm font-semibold text-slate-700">{String(stats.total).padStart(2, '0')} Total</Text>
+                  <Text className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                    {String(stats.total).padStart(2, '0')} Total
+                  </Text>
                 </View>
                 <View className="mb-2 flex-row items-center gap-2">
                   <FontAwesome name="clock-o" size={14} color="#f59e0b" />
-                  <Text className="text-sm font-semibold text-slate-700">
+                  <Text className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                     {String(stats.expiringSoon).padStart(2, '0')} Expiring
                   </Text>
                 </View>
                 <View className="flex-row items-center gap-2">
                   <FontAwesome name="exclamation-triangle" size={14} color="#ef4444" />
-                  <Text className="text-sm font-semibold text-slate-700">{String(stats.expired).padStart(2, '0')} Expired</Text>
+                  <Text className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                    {String(stats.expired).padStart(2, '0')} Expired
+                  </Text>
                 </View>
               </View>
             )}
@@ -213,7 +220,7 @@ export default function DocsScreen() {
             <DocsContentSkeleton />
           ) : (
             <Animated.View entering={hasLoadedOnce.current ? FadeIn.duration(220) : undefined}>
-              <View className="mb-3 rounded-xl border border-slate-200 bg-white p-2">
+              <View className="mb-3 rounded-xl border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-900">
                 <View className="flex-row  justify-between gap-y-2">
                   <FilterPill
                     label="All"
@@ -233,13 +240,13 @@ export default function DocsScreen() {
               </View>
 
               <View className="mb-2 flex-row items-center justify-between px-1">
-                <Text className="text-xl font-semibold text-slate-900">Your Documents</Text>
-                <Text className="text-sm font-medium text-blue-600">Sort by: Expiry Date</Text>
+                <Text className="text-xl font-semibold text-slate-900 dark:text-slate-100">Your Documents</Text>
+                <Text className="text-sm font-medium text-blue-600 dark:text-blue-400">Sort by: Expiry Date</Text>
               </View>
 
               {filteredDocs.length === 0 ? (
-                <View className="rounded-xl border border-slate-200 bg-white p-4">
-                  <Text className="text-sm text-slate-500">No documents found in this category.</Text>
+                <View className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+                  <Text className="text-sm text-slate-500 dark:text-slate-400">No documents found in this category.</Text>
                 </View>
               ) : (
                 filteredDocs.map((doc) => (
@@ -268,7 +275,7 @@ export default function DocsScreen() {
             className="h-16 w-16 items-center justify-center rounded-full bg-blue-600 shadow-lg shadow-blue-400/60">
             <FontAwesome name="plus" size={24} color="#ffffff" />
           </Pressable>
-          <Text className="mt-1 text-xs font-semibold text-blue-700">Add Document</Text>
+          <Text className="mt-1 text-xs font-semibold text-blue-700 dark:text-blue-400">Add Document</Text>
         </View>
       </View>
     </SafeAreaView>

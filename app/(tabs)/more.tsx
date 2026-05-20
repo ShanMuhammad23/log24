@@ -2,6 +2,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Link, useRouter } from 'expo-router';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { themePreferenceLabel, useAppTheme } from '@/contexts/ThemeProvider';
 import { supabase } from '@/utils/supabase';
 
 const SETTINGS_ITEMS = [
@@ -16,6 +17,10 @@ const SETTINGS_ITEMS = [
 
 export default function MoreScreen() {
   const router = useRouter();
+  const { preference, cyclePreference } = useAppTheme();
+
+  const themeIcon =
+    preference === 'dark' ? 'moon-o' : preference === 'light' ? 'sun-o' : ('adjust' as const);
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-slate-950">
@@ -50,6 +55,24 @@ export default function MoreScreen() {
             </Pressable>
           ))}
         </View>
+
+        <Pressable
+          onPress={() => cyclePreference()}
+          className="mt-5 overflow-hidden rounded-2xl bg-slate-900 active:bg-slate-800"
+          android_ripple={{ color: 'rgba(148,163,184,0.2)' }}>
+          <View className="flex-row items-center justify-between px-5 py-4">
+            <View className="flex-row items-center">
+              <View className="mr-3 h-8 w-8 items-center justify-center rounded-lg bg-slate-800">
+                <FontAwesome name={themeIcon} size={14} color="#bfdbfe" />
+              </View>
+              <View>
+                <Text className="text-base font-medium text-slate-100">App Theme</Text>
+                <Text className="text-sm text-slate-400">{themePreferenceLabel(preference)}</Text>
+              </View>
+            </View>
+            <Text className="text-sm font-semibold text-blue-400">Change</Text>
+          </View>
+        </Pressable>
 
         <Pressable
           onPress={async () => {

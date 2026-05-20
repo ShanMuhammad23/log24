@@ -122,3 +122,11 @@ export function toLabel(
   if (!value) return '-';
   return options.find((option) => option.value === value)?.label ?? value;
 }
+
+export function filterOrganizationOptions(query: string, maxResults = 20) {
+  const normalized = query.trim().toLowerCase();
+  const matches = normalized
+    ? ORGANIZATION_OPTIONS.filter((option) => option.label.toLowerCase().includes(normalized))
+    : [...ORGANIZATION_OPTIONS];
+  return matches.slice(0, maxResults);
+}

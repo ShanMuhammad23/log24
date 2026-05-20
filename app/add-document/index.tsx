@@ -116,6 +116,7 @@ export default function AddDocumentScreen() {
       document_name: documentName.trim(),
       expiry_date: expiryDate || null,
       issue_date: issueDate || null,
+      reminder_days_before: reminder,
     });
     router.back();
   };
@@ -131,93 +132,101 @@ export default function AddDocumentScreen() {
   };
 
   return (
-    <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-slate-50">
+    <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-slate-50 dark:bg-slate-950">
       <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 28 }}>
         <View className="mb-5 flex-row items-center gap-3">
-          <Pressable onPress={() => router.back()} className="h-10 w-10 items-center justify-center rounded-full bg-slate-200">
-            <FontAwesome name="angle-left" size={18} color="#0f172a" />
+          <Pressable
+            onPress={() => router.back()}
+            className="h-10 w-10 items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800">
+            <FontAwesome name="angle-left" size={18} color="#94a3b8" />
           </Pressable>
-          <Text className="text-2xl font-bold text-slate-900">Add Document</Text>
+          <Text className="text-2xl font-bold text-slate-900 dark:text-slate-100">Add Document</Text>
         </View>
 
         <View className="mb-4">
-          <Text className="mb-2 text-sm font-semibold text-slate-700">Document Type *</Text>
+          <Text className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Document Type *</Text>
           <TextInput
             value={documentType}
             onChangeText={setDocumentType}
             placeholder="e.g. Passport, Class 2 Medical"
             placeholderTextColor="#64748b"
-            className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900"
+            className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           />
         </View>
 
         <View className="mb-4">
-          <Text className="mb-2 text-sm font-semibold text-slate-700">Document Name *</Text>
+          <Text className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Document Name *</Text>
           <TextInput
             value={documentName}
             onChangeText={setDocumentName}
             placeholder="Enter document name"
             placeholderTextColor="#64748b"
-            className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900"
+            className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           />
         </View>
 
         <View className="mb-4">
-          <Text className="mb-2 text-sm font-semibold text-slate-700">Issuer</Text>
+          <Text className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Issuer</Text>
           <TextInput
             value={issuer}
             onChangeText={setIssuer}
             placeholder="Issuing authority"
             placeholderTextColor="#64748b"
-            className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900"
+            className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           />
         </View>
 
         <View className="mb-4 flex-row gap-3">
           <View className="flex-1">
-            <Text className="mb-2 text-sm font-semibold text-slate-700">Issue Date</Text>
+            <Text className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Issue Date</Text>
             <Pressable
               onPress={() => setShowIssuePicker(true)}
-              className="flex-row items-center justify-between rounded-xl border border-slate-300 bg-white px-4 py-3">
-              <Text className={issueDate ? 'text-slate-900' : 'text-slate-500'}>{issueDate || 'YYYY-MM-DD'}</Text>
+              className="flex-row items-center justify-between rounded-xl border border-slate-300 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900">
+              <Text className={issueDate ? 'text-slate-900 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400'}>
+                {issueDate || 'YYYY-MM-DD'}
+              </Text>
               <FontAwesome name="calendar" size={15} color="#64748b" />
             </Pressable>
           </View>
           <View className="flex-1">
-            <Text className="mb-2 text-sm font-semibold text-slate-700">Expiry Date</Text>
+            <Text className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Expiry Date</Text>
             <Pressable
               onPress={() => setShowExpiryPicker(true)}
-              className="flex-row items-center justify-between rounded-xl border border-slate-300 bg-white px-4 py-3">
-              <Text className={expiryDate ? 'text-slate-900' : 'text-slate-500'}>{expiryDate || 'YYYY-MM-DD'}</Text>
+              className="flex-row items-center justify-between rounded-xl border border-slate-300 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900">
+              <Text className={expiryDate ? 'text-slate-900 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400'}>
+                {expiryDate || 'YYYY-MM-DD'}
+              </Text>
               <FontAwesome name="calendar" size={15} color="#64748b" />
             </Pressable>
           </View>
         </View>
 
         <View className="mb-4">
-          <Text className="mb-2 text-sm font-semibold text-slate-700">Reminder Days Before Expiry</Text>
+          <Text className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Reminder Days Before Expiry</Text>
           <TextInput
             value={reminderDays}
             onChangeText={setReminderDays}
             keyboardType="numeric"
             placeholder="15"
             placeholderTextColor="#64748b"
-            className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900"
+            className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           />
         </View>
 
         <View className="mb-4">
-          <Text className="mb-2 text-sm font-semibold text-slate-700">Document File</Text>
+          <Text className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Document File</Text>
           <Pressable
             onPress={pickFile}
-            className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3">
-            <Text className="text-base font-medium text-blue-700">{selectedFile ? 'Change File' : 'Choose File'}</Text>
-            <Text className="mt-1 text-sm text-slate-500">PDF, PNG, JPG. File details auto-filled.</Text>
+            className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3 dark:border-slate-600 dark:bg-slate-900">
+            <Text className="text-base font-medium text-blue-700 dark:text-blue-400">
+              {selectedFile ? 'Change File' : 'Choose File'}
+            </Text>
+            <Text className="mt-1 text-sm text-slate-500 dark:text-slate-400">PDF, PNG, JPG. File details auto-filled.</Text>
           </Pressable>
           {selectedFile ? (
-            <View className="mt-2 rounded-xl bg-slate-100 px-3 py-2">
-              <Text className="text-sm font-medium text-slate-700">{selectedFile.name}</Text>
-              <Text className="text-xs text-slate-500">
+            <View className="mt-2 rounded-xl bg-slate-100 px-3 py-2 dark:bg-slate-800">
+              <Text className="text-sm font-medium text-slate-700 dark:text-slate-200">{selectedFile.name}</Text>
+              <Text className="text-xs text-slate-500 dark:text-slate-400">
                 {selectedFile.mimeType || 'application/octet-stream'} • {selectedFile.size || 0} bytes
               </Text>
             </View>
@@ -225,7 +234,7 @@ export default function AddDocumentScreen() {
         </View>
 
         <View className="mb-2">
-          <Text className="mb-2 text-sm font-semibold text-slate-700">Notes</Text>
+          <Text className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Notes</Text>
           <TextInput
             value={notes}
             onChangeText={setNotes}
@@ -234,11 +243,11 @@ export default function AddDocumentScreen() {
             multiline
             numberOfLines={4}
             textAlignVertical="top"
-            className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900"
+            className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           />
         </View>
 
-        {error ? <Text className="mt-3 text-sm text-red-500">{error}</Text> : null}
+        {error ? <Text className="mt-3 text-sm text-red-500 dark:text-red-400">{error}</Text> : null}
 
         <Pressable
           onPress={saveDocument}

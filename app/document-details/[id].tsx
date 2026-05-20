@@ -17,6 +17,7 @@ import { useSupabaseSession } from '@/utils/auth';
 import {
   createPilotDocumentSignedUrl,
   fetchPilotDocumentById,
+  daysUntilExpiry,
   formatDocumentFileSize,
   isImageMimeType,
   PilotDocument,
@@ -27,15 +28,6 @@ function formatDate(value: string | null) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-}
-
-function dayDiffFromNow(dateValue: string | null) {
-  if (!dateValue) return null;
-  const now = new Date();
-  const expiry = new Date(dateValue);
-  now.setHours(0, 0, 0, 0);
-  expiry.setHours(0, 0, 0, 0);
-  return Math.floor((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 }
 
 function StatusBadge({ status }: { status: PilotDocument['status'] }) {
@@ -152,7 +144,7 @@ export default function DocumentDetailsScreen() {
     );
   }
 
-  const days = dayDiffFromNow(document?.expiry_date ?? null);
+  const days = daysUntilExpiry(document?.expiry_date ?? null);
 
   return (
     <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-slate-50">

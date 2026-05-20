@@ -1,42 +1,119 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, Switch, Text, TextInput, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  ScrollView,
+  Switch,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { DEFAULT_CAPACITY_OPTIONS } from '@/utils/profile';
 import { useSupabaseSession } from '@/utils/auth';
+import {
+  blockMinutesFromOutIn,
+  buildFlightSavePayload,
+  fetchLastFlightDefaults,
+  formatDateISO,
+  formatDuration,
+  formatTimeFromDb,
+  minutesToHHMM,
+  type FlightSaveInput,
+} from '@/utils/flight-form';
+import { DEFAULT_CAPACITY_OPTIONS, getProfile } from '@/utils/profile';
 import { supabase } from '@/utils/supabase';
 
-function toMinutes(value: string) {
-  const [h, m] = value.split(':').map((v) => Number(v));
-  if (Number.isNaN(h) || Number.isNaN(m)) return null;
-  return h * 60 + m;
+type FlightFormRow = {
+  flight_date: string;
+  flight_number: string | null;
+  aircraft_type: string | null;
+  aircraft_registration: string | null;
+  origin_iata: string | null;
+  destination_iata: string | null;
+  block_time_minutes: number | null;
+  night_time_minutes: number | null;
+  instrument_time_minutes: number | null;
+  instrument_timings_minutes: number | null;
+  ifr_actual_minutes: number | null;
+  ifr_simulated_minutes: number | null;
+  cross_country_total_minutes: number | null;
+  operating_capacity: string | null;
+  pic_name: string | null;
+  co_pilot_name: string | null;
+  out_time: string | null;
+  in_time: string | null;
+  route_points: string | null;
+  distance_nm: number | null;
+  remarks: string | null;
+  signature_url: string | null;
+  takeoffs: number | null;
+  landings: number | null;
+  go_arounds: number | null;
+  is_cross_country: boolean;
+  pf_takeoff_landing: boolean;
+  stl: boolean;
+  multi_crew: boolean;
+  ulr_ops: boolean;
+};
+
+function FieldRow({
+  label,
+  required,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <View className="mb-3 flex-row items-center gap-3">
+      <Text className="w-36 text-sm font-semibold text-slate-300">
+        {label}
+        {required ? ' *' : ''}
+      </Text>
+      <View className="flex-1">{children}</View>
+    </View>
+  );
 }
 
-function formatDuration(totalMinutes: number) {
-  const h = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}
-
-function formatDateISO(dateValue: Date) {
-  const y = dateValue.getFullYear();
-  const m = String(dateValue.getMonth() + 1).padStart(2, '0');
-  const d = String(dateValue.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
-function formatTimeHHMM(dateValue: Date) {
-  const h = String(dateValue.getHours()).padStart(2, '0');
-  const m = String(dateValue.getMinutes()).padStart(2, '0');
-  return `${h}:${m}`;
+function TextField({
+  value,
+  onChangeText,
+  placeholder,
+  autoCapitalize,
+  keyboardType,
+}: {
+  value: string;
+  onChangeText: (v: string) => void;
+  placeholder: string;
+  autoCapitalize?: 'none' | 'characters' | 'words' | 'sentences';
+  keyboardType?: 'default' | 'number-pad' | 'numeric';
+}) {
+  return (
+    <TextInput
+      value={value}
+      onChangeText={onChangeText}
+      placeholder={placeholder}
+      placeholderTextColor="#64748b"
+      autoCapitalize={autoCapitalize}
+      keyboardType={keyboardType}
+      className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-base text-white"
+    />
+  );
 }
 
 export default function AddFlightScreen() {
   const router = useRouter();
+  const { id: editFlightId } = useLocalSearchParams<{ id?: string }>();
+  const isEditing = Boolean(editFlightId);
   const { session } = useSupabaseSession();
-  const [date, setDate] = useState('');
+  const [loadingFlight, setLoadingFlight] = useState(Boolean(editFlightId));
+  const [prefilling, setPrefilling] = useState(!isEditing);
+
+  const [date, setDate] = useState(() => formatDateISO(new Date()));
   const [flightNo, setFlightNo] = useState('');
   const [registration, setRegistration] = useState('');
   const [aircraftType, setAircraftType] = useState('');
@@ -50,7 +127,6 @@ export default function AddFlightScreen() {
   const [routePoints, setRoutePoints] = useState('');
   const [distance, setDistance] = useState('');
   const [remarks, setRemarks] = useState('');
-  const [attachments, setAttachments] = useState('');
   const [signature, setSignature] = useState('');
   const [instrumentTimings, setInstrumentTimings] = useState('');
   const [ifrSimulated, setIfrSimulated] = useState('');
@@ -58,6 +134,9 @@ export default function AddFlightScreen() {
   const [capacityOpen, setCapacityOpen] = useState(false);
   const [outTime, setOutTime] = useState('');
   const [inTime, setInTime] = useState('');
+  const [takeoffs, setTakeoffs] = useState('1');
+  const [landings, setLandings] = useState('1');
+  const [goArounds, setGoArounds] = useState('0');
   const [isCrossCountry, setIsCrossCountry] = useState(false);
   const [pfTakeoffLanding, setPfTakeoffLanding] = useState(false);
   const [stl, setStl] = useState(false);
@@ -66,55 +145,188 @@ export default function AddFlightScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showOutPicker, setShowOutPicker] = useState(false);
-  const [showInPicker, setShowInPicker] = useState(false);
-  const [showNightPicker, setShowNightPicker] = useState(false);
-  const [showIfrActualPicker, setShowIfrActualPicker] = useState(false);
-  const [showCrossCountryPicker, setShowCrossCountryPicker] = useState(false);
-  const [showInstrumentPicker, setShowInstrumentPicker] = useState(false);
-  const [showIfrSimulatedPicker, setShowIfrSimulatedPicker] = useState(false);
 
   const totalTime = useMemo(() => {
-    const out = toMinutes(outTime);
-    const input = toMinutes(inTime);
-    if (out === null || input === null) return '--:--';
-    const diff = input >= out ? input - out : 24 * 60 - out + input;
-    return formatDuration(diff);
+    const minutes = blockMinutesFromOutIn(outTime, inTime);
+    if (minutes === null) return '--:--';
+    return formatDuration(minutes);
   }, [outTime, inTime]);
 
-  const baseFields: Array<[string, string]> = [
-    ['Flight No.', 'e.g. AI302'],
-    ['Registration *', 'e.g. VT-ABC'],
-    ['A/c Type *', 'e.g. A320'],
-    ['From *', 'Departure'],
-    ['To *', 'Arrival'],
-  ];
+  const formInput = useMemo<FlightSaveInput>(
+    () => ({
+      date,
+      flightNo,
+      registration,
+      aircraftType,
+      from,
+      to,
+      operatingCapacity: operatingCapacity || '',
+      outTime,
+      inTime,
+      picName,
+      coPilotName,
+      night,
+      ifrActual,
+      crossCountryTotal,
+      instrumentTimings,
+      ifrSimulated,
+      routePoints,
+      distance,
+      remarks,
+      signature,
+      takeoffs,
+      landings,
+      goArounds,
+      isCrossCountry,
+      pfTakeoffLanding,
+      stl,
+      multiCrew,
+      ulrOps,
+    }),
+    [
+      date,
+      flightNo,
+      registration,
+      aircraftType,
+      from,
+      to,
+      operatingCapacity,
+      outTime,
+      inTime,
+      picName,
+      coPilotName,
+      night,
+      ifrActual,
+      crossCountryTotal,
+      instrumentTimings,
+      ifrSimulated,
+      routePoints,
+      distance,
+      remarks,
+      signature,
+      takeoffs,
+      landings,
+      goArounds,
+      isCrossCountry,
+      pfTakeoffLanding,
+      stl,
+      multiCrew,
+      ulrOps,
+    ]
+  );
 
-  const otherFields: Array<[string, string]> = [
-    ['PIC Name', 'Pilot in command'],
-    ['Co Pilot Name', 'Co-pilot'],
-    ['Route (Overfly points)', 'VOR / waypoints'],
-    ['Distance', 'NM'],
-    ['Remarks', 'Any notes'],
-    ['Attachments', 'Attachment URL or reference'],
-    ['Signature', 'Signature reference'],
-  ];
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId) {
+      setPrefilling(false);
+      setLoadingFlight(false);
+      return;
+    }
 
-  const handleDateChange = (_event: DateTimePickerEvent, selectedDate?: Date) => {
-    setShowDatePicker(false);
-    if (selectedDate) setDate(formatDateISO(selectedDate));
-  };
+    if (isEditing && editFlightId) {
+      let cancelled = false;
 
-  const handleTimeChange = (
-    setter: (v: string) => void,
-    toggleSetter: (v: boolean) => void,
-    _event: DateTimePickerEvent,
-    selectedDate?: Date
-  ) => {
-    toggleSetter(false);
-    if (selectedDate) setter(formatTimeHHMM(selectedDate));
-  };
+      const loadFlight = async () => {
+        setLoadingFlight(true);
+        setError(null);
+
+        const { data, error: loadError } = await supabase
+          .from('flights')
+          .select(
+            'flight_date, flight_number, aircraft_type, aircraft_registration, origin_iata, destination_iata, block_time_minutes, night_time_minutes, instrument_time_minutes, instrument_timings_minutes, ifr_actual_minutes, ifr_simulated_minutes, cross_country_total_minutes, operating_capacity, pic_name, co_pilot_name, out_time, in_time, route_points, distance_nm, remarks, signature_url, takeoffs, landings, go_arounds, is_cross_country, pf_takeoff_landing, stl, multi_crew, ulr_ops'
+          )
+          .eq('id', editFlightId)
+          .eq('user_id', userId)
+          .maybeSingle<FlightFormRow>();
+
+        if (cancelled) return;
+
+        if (loadError || !data) {
+          setError(loadError?.message || 'Flight not found.');
+          setLoadingFlight(false);
+          return;
+        }
+
+        setDate(data.flight_date);
+        setFlightNo(data.flight_number || '');
+        setRegistration(data.aircraft_registration || '');
+        setAircraftType(data.aircraft_type || '');
+        setFrom(data.origin_iata || '');
+        setTo(data.destination_iata || '');
+        setPicName(data.pic_name || '');
+        setCoPilotName(data.co_pilot_name || '');
+        setOutTime(formatTimeFromDb(data.out_time));
+        setInTime(formatTimeFromDb(data.in_time));
+        setNight(minutesToHHMM(data.night_time_minutes));
+        setIfrActual(minutesToHHMM(data.ifr_actual_minutes));
+        setCrossCountryTotal(minutesToHHMM(data.cross_country_total_minutes));
+        setInstrumentTimings(minutesToHHMM(data.instrument_timings_minutes ?? data.instrument_time_minutes));
+        setIfrSimulated(minutesToHHMM(data.ifr_simulated_minutes));
+        setRoutePoints(data.route_points || '');
+        setDistance(data.distance_nm != null ? String(data.distance_nm) : '');
+        setRemarks(data.remarks || '');
+        setSignature(data.signature_url || '');
+        setTakeoffs(String(data.takeoffs ?? 1));
+        setLandings(String(data.landings ?? 1));
+        setGoArounds(String(data.go_arounds ?? 0));
+        setOperatingCapacity(data.operating_capacity);
+        setIsCrossCountry(data.is_cross_country);
+        setPfTakeoffLanding(data.pf_takeoff_landing);
+        setStl(data.stl);
+        setMultiCrew(data.multi_crew);
+        setUlrOps(data.ulr_ops);
+        setLoadingFlight(false);
+      };
+
+      loadFlight();
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    let cancelled = false;
+
+    const prefillNewFlight = async () => {
+      setPrefilling(true);
+      setDate(formatDateISO(new Date()));
+
+      const [{ data: lastFlight }, profile] = await Promise.all([
+        fetchLastFlightDefaults(userId),
+        getProfile(userId),
+      ]);
+
+      if (cancelled) return;
+
+      if (lastFlight) {
+        setFlightNo(lastFlight.flight_number || '');
+        setRegistration(lastFlight.aircraft_registration || '');
+        setAircraftType(lastFlight.aircraft_type || '');
+        setFrom(lastFlight.origin_iata || '');
+        setTo(lastFlight.destination_iata || '');
+        setCoPilotName(lastFlight.co_pilot_name || '');
+        setTakeoffs(String(lastFlight.takeoffs ?? 1));
+        setLandings(String(lastFlight.landings ?? 1));
+        setGoArounds(String(lastFlight.go_arounds ?? 0));
+        if (lastFlight.operating_capacity) setOperatingCapacity(lastFlight.operating_capacity);
+        if (lastFlight.pic_name) setPicName(lastFlight.pic_name);
+      }
+
+      if (!lastFlight?.pic_name && profile?.full_name) {
+        setPicName(profile.full_name);
+      }
+      if (!lastFlight?.operating_capacity && profile?.default_operating_capacity) {
+        setOperatingCapacity(profile.default_operating_capacity);
+      }
+
+      setPrefilling(false);
+    };
+
+    prefillNewFlight();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [editFlightId, isEditing, session?.user?.id]);
 
   const saveFlight = async () => {
     const userId = session?.user?.id;
@@ -123,8 +335,20 @@ export default function AddFlightScreen() {
       return;
     }
 
-    if (!date.trim() || !registration.trim() || !aircraftType.trim() || !from.trim() || !to.trim() || !operatingCapacity) {
+    if (
+      !date.trim() ||
+      !registration.trim() ||
+      !aircraftType.trim() ||
+      !from.trim() ||
+      !to.trim() ||
+      !operatingCapacity
+    ) {
       setError('Please fill all required fields (*) before saving.');
+      return;
+    }
+
+    if (!picName.trim()) {
+      setError('PIC name is required.');
       return;
     }
 
@@ -132,41 +356,34 @@ export default function AddFlightScreen() {
     setError(null);
     setSuccess(null);
 
-    const blockMinutes = (() => {
-      const out = toMinutes(outTime);
-      const input = toMinutes(inTime);
-      if (out === null || input === null) return null;
-      return input >= out ? input - out : 24 * 60 - out + input;
-    })();
+    const payload = buildFlightSavePayload(formInput);
 
-    const nightMinutes = toMinutes(night);
-    const instrumentMinutes = toMinutes(instrumentTimings);
+    const saveError = isEditing
+      ? (
+          await supabase
+            .from('flights')
+            .update(payload)
+            .eq('id', editFlightId!)
+            .eq('user_id', userId)
+        ).error
+      : (await supabase.from('flights').insert({ ...payload, user_id: userId })).error;
 
-    const payload: Record<string, unknown> = {
-      user_id: userId,
-      flight_date: date.trim(),
-      flight_number: flightNo.trim() || null,
-      aircraft_type: aircraftType.trim(),
-      aircraft_registration: registration.trim(),
-      origin_iata: from.trim().toUpperCase(),
-      destination_iata: to.trim().toUpperCase(),
-      block_time_minutes: blockMinutes,
-      night_time_minutes: nightMinutes,
-      instrument_time_minutes: instrumentMinutes,
-      remarks: remarks.trim() || null,
-    };
-
-    const { error: insertError } = await supabase.from('flights').insert(payload);
     setSaving(false);
 
-    if (insertError) {
-      setError(insertError.message);
+    if (saveError) {
+      setError(saveError.message);
       return;
     }
 
-    setSuccess('Flight saved successfully.');
-    router.replace('/(tabs)');
+    setSuccess(isEditing ? 'Flight updated successfully.' : 'Flight saved successfully.');
+    if (isEditing) {
+      router.back();
+    } else {
+      router.replace('/(tabs)');
+    }
   };
+
+  const busy = loadingFlight || prefilling;
 
   return (
     <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-slate-950">
@@ -175,161 +392,129 @@ export default function AddFlightScreen() {
           <Pressable onPress={() => router.back()} className="h-10 w-10 items-center justify-center rounded-full bg-slate-800">
             <FontAwesome name="angle-left" size={18} color="#e2e8f0" />
           </Pressable>
-          <Text className="text-2xl font-bold text-white">Add Flight</Text>
+          <Text className="text-2xl font-bold text-white">{isEditing ? 'Edit Flight' : 'Log Flight'}</Text>
         </View>
 
-        <View className="mb-3 flex-row items-center gap-3">
-          <Text className="w-36 text-sm font-semibold text-slate-300">Date *</Text>
-          <Pressable
-            onPress={() => setShowDatePicker(true)}
-            className="flex-1 flex-row items-center justify-between rounded-xl border border-slate-700 bg-slate-900 px-4 py-3">
-            <Text className={`text-base ${date ? 'text-white' : 'text-slate-500'}`}>{date || 'YYYY-MM-DD'}</Text>
-            <FontAwesome name="calendar" size={15} color="#94a3b8" />
-          </Pressable>
-        </View>
-
-        {baseFields.map(([label, placeholder]) => (
-          <View key={label} className="mb-3 flex-row items-center gap-3">
-            <Text className="w-36 text-sm font-semibold text-slate-300">{label}</Text>
-            <TextInput
-              value={
-                label === 'Date *'
-                  ? date
-                  : label === 'Flight No.'
-                  ? flightNo
-                  : label === 'Registration *'
-                  ? registration
-                  : label === 'A/c Type *'
-                  ? aircraftType
-                  : label === 'From *'
-                  ? from
-                  : to
-              }
-              onChangeText={
-                label === 'Date *'
-                  ? setDate
-                  : label === 'Flight No.'
-                  ? setFlightNo
-                  : label === 'Registration *'
-                  ? setRegistration
-                  : label === 'A/c Type *'
-                  ? setAircraftType
-                  : label === 'From *'
-                  ? setFrom
-                  : setTo
-              }
-              placeholder={placeholder}
-              placeholderTextColor="#64748b"
-              className="flex-1 rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-base text-white"
-            />
+        {busy ? (
+          <View className="mb-4 items-center py-8">
+            <ActivityIndicator color="#60a5fa" />
+            <Text className="mt-3 text-sm text-slate-400">{isEditing ? 'Loading flight...' : 'Preparing form...'}</Text>
           </View>
-        ))}
+        ) : null}
 
-        <View className="mb-3 flex-row items-center gap-3">
-          <Text className="w-36 text-sm font-semibold text-slate-300">Operating Capacity *</Text>
+        <FieldRow label="Date" required>
+          <TextInput
+            value={date}
+            onChangeText={setDate}
+            placeholder="YYYY-MM-DD"
+            placeholderTextColor="#64748b"
+            className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-base text-white"
+          />
+        </FieldRow>
+
+        <FieldRow label="Flight No.">
+          <TextField value={flightNo} onChangeText={setFlightNo} placeholder="e.g. AI302" />
+        </FieldRow>
+        <FieldRow label="Registration" required>
+          <TextField value={registration} onChangeText={setRegistration} placeholder="e.g. VT-ABC" autoCapitalize="characters" />
+        </FieldRow>
+        <FieldRow label="A/c Type" required>
+          <TextField value={aircraftType} onChangeText={setAircraftType} placeholder="e.g. DA40" autoCapitalize="characters" />
+        </FieldRow>
+        <FieldRow label="From" required>
+          <TextField value={from} onChangeText={setFrom} placeholder="Departure" autoCapitalize="characters" />
+        </FieldRow>
+        <FieldRow label="To" required>
+          <TextField value={to} onChangeText={setTo} placeholder="Arrival" autoCapitalize="characters" />
+        </FieldRow>
+
+        <FieldRow label="Operating Capacity" required>
           <Pressable
             onPress={() => setCapacityOpen(true)}
-            className="flex-1 flex-row items-center justify-between rounded-xl border border-slate-700 bg-slate-900 px-4 py-3">
+            className="flex-row items-center justify-between rounded-xl border border-slate-700 bg-slate-900 px-4 py-3">
             <Text className={`text-base ${operatingCapacity ? 'text-white' : 'text-slate-500'}`}>
-              {DEFAULT_CAPACITY_OPTIONS.find((c) => c.value === operatingCapacity)?.label || 'Select operating capacity'}
+              {DEFAULT_CAPACITY_OPTIONS.find((c) => c.value === operatingCapacity)?.label || 'Select capacity'}
             </Text>
             <FontAwesome name="chevron-down" size={13} color="#94a3b8" />
           </Pressable>
+        </FieldRow>
+
+        <FieldRow label="Out Time">
+          <TextField value={outTime} onChangeText={setOutTime} placeholder="HH:MM or 0930" keyboardType="numeric" />
+        </FieldRow>
+        <FieldRow label="In Time">
+          <TextField value={inTime} onChangeText={setInTime} placeholder="HH:MM or 1030" keyboardType="numeric" />
+        </FieldRow>
+        <View className="mb-4 ml-[9.75rem] rounded-xl border border-blue-900/50 bg-blue-950/40 px-4 py-2.5">
+          <Text className="text-xs font-semibold uppercase tracking-wide text-blue-300">Total block time</Text>
+          <Text className="mt-0.5 text-2xl font-bold text-blue-200">{totalTime}</Text>
         </View>
 
-        {[
-          ['Out Time', outTime, setOutTime, setShowOutPicker],
-          ['In Time', inTime, setInTime, setShowInPicker],
-          ['Night', night, setNight, setShowNightPicker],
-          ['IFR Actual', ifrActual, setIfrActual, setShowIfrActualPicker],
-          ['Cross country Total', crossCountryTotal, setCrossCountryTotal, setShowCrossCountryPicker],
-          ['Instrument Timings', instrumentTimings, setInstrumentTimings, setShowInstrumentPicker],
-          ['IFR Simulated', ifrSimulated, setIfrSimulated, setShowIfrSimulatedPicker],
-        ].map(([label, value, setter, toggle]) => (
-          <View key={label as string} className="mb-3 flex-row items-center gap-3">
-            <Text className="w-36 text-sm font-semibold text-slate-300">{label as string}</Text>
-            <Pressable
-              onPress={() => (toggle as (v: boolean) => void)(true)}
-              className="flex-1 flex-row items-center justify-between rounded-xl border border-slate-700 bg-slate-900 px-4 py-3">
-              <Text className={`text-base ${(value as string) ? 'text-white' : 'text-slate-500'}`}>
-                {(value as string) || 'HH:MM'}
-              </Text>
-              <FontAwesome name="clock-o" size={14} color="#94a3b8" />
-            </Pressable>
-          </View>
-        ))}
+        <FieldRow label="PIC Name" required>
+          <TextField value={picName} onChangeText={setPicName} placeholder="Pilot in command" autoCapitalize="words" />
+        </FieldRow>
+        <FieldRow label="Co Pilot">
+          <TextField value={coPilotName} onChangeText={setCoPilotName} placeholder="Instructor / co-pilot" autoCapitalize="words" />
+        </FieldRow>
 
-        {otherFields.map(([label, placeholder]) => (
-          <View key={label} className="mb-3 flex-row items-center gap-3">
-            <Text className="w-36 text-sm font-semibold text-slate-300">{label}</Text>
-            <TextInput
-              value={
-                label === 'Out Time'
-                  ? outTime
-                  : label === 'In Time'
-                  ? inTime
-                  : label === 'PIC Name'
-                  ? picName
-                  : label === 'Co Pilot Name'
-                  ? coPilotName
-                  : label === 'Route (Overfly points)'
-                  ? routePoints
-                  : label === 'Distance'
-                  ? distance
-                  : label === 'Remarks'
-                  ? remarks
-                  : label === 'Attachments'
-                  ? attachments
-                  : label === 'Signature'
-                  ? signature
-                  : ''
-              }
-              onChangeText={
-                label === 'Out Time'
-                  ? setOutTime
-                  : label === 'In Time'
-                  ? setInTime
-                  : label === 'PIC Name'
-                  ? setPicName
-                  : label === 'Co Pilot Name'
-                  ? setCoPilotName
-                  : label === 'Route (Overfly points)'
-                  ? setRoutePoints
-                  : label === 'Distance'
-                  ? setDistance
-                  : label === 'Remarks'
-                  ? setRemarks
-                  : label === 'Attachments'
-                  ? setAttachments
-                  : label === 'Signature'
-                  ? setSignature
-                  : setRemarks
-              }
-              placeholder={placeholder}
-              placeholderTextColor="#64748b"
-              className="flex-1 rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-base text-white"
-            />
-          </View>
-        ))}
-
-        <View className="mb-4 flex-row items-center gap-3 rounded-xl border border-slate-700 bg-slate-900 px-4 py-3">
-          <Text className="w-36 text-sm font-semibold text-slate-300">Total Time (auto)</Text>
-          <Text className="text-lg font-bold text-blue-300">{totalTime}</Text>
+        <View className="mb-4 flex-row gap-2">
+          {[
+            ['Takeoffs', takeoffs, setTakeoffs],
+            ['Landings', landings, setLandings],
+            ['Go Around', goArounds, setGoArounds],
+          ].map(([label, value, setter]) => (
+            <View key={label as string} className="flex-1">
+              <Text className="mb-1.5 text-xs font-semibold uppercase text-slate-400">{label as string}</Text>
+              <TextInput
+                value={value as string}
+                onChangeText={setter as (v: string) => void}
+                keyboardType="number-pad"
+                placeholder="0"
+                placeholderTextColor="#64748b"
+                className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-3 text-center text-base text-white"
+              />
+            </View>
+          ))}
         </View>
+
+        <FieldRow label="Night">
+          <TextField value={night} onChangeText={setNight} placeholder="HH:MM" keyboardType="numeric" />
+        </FieldRow>
+        <FieldRow label="IFR Actual">
+          <TextField value={ifrActual} onChangeText={setIfrActual} placeholder="HH:MM" keyboardType="numeric" />
+        </FieldRow>
+        <FieldRow label="X-C Total">
+          <TextField value={crossCountryTotal} onChangeText={setCrossCountryTotal} placeholder="HH:MM" keyboardType="numeric" />
+        </FieldRow>
+        <FieldRow label="Instrument">
+          <TextField value={instrumentTimings} onChangeText={setInstrumentTimings} placeholder="HH:MM" keyboardType="numeric" />
+        </FieldRow>
+        <FieldRow label="IFR Sim">
+          <TextField value={ifrSimulated} onChangeText={setIfrSimulated} placeholder="HH:MM" keyboardType="numeric" />
+        </FieldRow>
+        <FieldRow label="Route">
+          <TextField value={routePoints} onChangeText={setRoutePoints} placeholder="VOR / waypoints" />
+        </FieldRow>
+        <FieldRow label="Distance">
+          <TextField value={distance} onChangeText={setDistance} placeholder="NM" keyboardType="numeric" />
+        </FieldRow>
+        <FieldRow label="Remarks">
+          <TextField value={remarks} onChangeText={setRemarks} placeholder="Any notes" />
+        </FieldRow>
 
         <View className="mb-5 rounded-xl border border-slate-700 bg-slate-900 px-4 py-3">
           {[
-            ['Is cross Country', isCrossCountry, setIsCrossCountry],
+            ['Cross country flight', isCrossCountry, setIsCrossCountry],
             ['PF (actual T/O + LDG)', pfTakeoffLanding, setPfTakeoffLanding],
             ['STL (Co-pilot only)', stl, setStl],
-            ['Multi Crew', multiCrew, setMultiCrew],
-            ['ULR Ops', ulrOps, setUlrOps],
+            ['Multi crew', multiCrew, setMultiCrew],
+            ['ULR ops', ulrOps, setUlrOps],
           ].map(([label, value, setter]) => (
             <View key={label as string} className="mb-2 flex-row items-center justify-between last:mb-0">
               <Text className="text-sm font-medium text-slate-200">{label as string}</Text>
               <Switch
                 value={value as boolean}
-                onValueChange={setter as (value: boolean) => void}
+                onValueChange={setter as (v: boolean) => void}
                 trackColor={{ false: '#475569', true: '#2563eb' }}
               />
             </View>
@@ -341,9 +526,11 @@ export default function AddFlightScreen() {
 
         <Pressable
           onPress={saveFlight}
-          disabled={saving}
+          disabled={saving || busy}
           className="items-center rounded-xl bg-blue-600 py-3.5 active:bg-blue-700 disabled:opacity-60">
-          <Text className="text-base font-semibold text-white">{saving ? 'Saving...' : 'Save Flight'}</Text>
+          <Text className="text-base font-semibold text-white">
+            {saving ? (isEditing ? 'Updating...' : 'Saving...') : isEditing ? 'Update Flight' : 'Save Flight'}
+          </Text>
         </Pressable>
       </ScrollView>
 
@@ -373,84 +560,6 @@ export default function AddFlightScreen() {
           </View>
         </View>
       </Modal>
-
-      {showDatePicker ? (
-        <DateTimePicker
-          value={date ? new Date(`${date}T00:00:00`) : new Date()}
-          mode="date"
-          display="default"
-          onChange={handleDateChange}
-        />
-      ) : null}
-      {showOutPicker ? (
-        <DateTimePicker
-          value={outTime ? new Date(`2000-01-01T${outTime}:00`) : new Date()}
-          mode="time"
-          is24Hour
-          display="default"
-          onChange={(event, selected) => handleTimeChange(setOutTime, setShowOutPicker, event, selected)}
-        />
-      ) : null}
-      {showInPicker ? (
-        <DateTimePicker
-          value={inTime ? new Date(`2000-01-01T${inTime}:00`) : new Date()}
-          mode="time"
-          is24Hour
-          display="default"
-          onChange={(event, selected) => handleTimeChange(setInTime, setShowInPicker, event, selected)}
-        />
-      ) : null}
-      {showNightPicker ? (
-        <DateTimePicker
-          value={night ? new Date(`2000-01-01T${night}:00`) : new Date()}
-          mode="time"
-          is24Hour
-          display="default"
-          onChange={(event, selected) => handleTimeChange(setNight, setShowNightPicker, event, selected)}
-        />
-      ) : null}
-      {showIfrActualPicker ? (
-        <DateTimePicker
-          value={ifrActual ? new Date(`2000-01-01T${ifrActual}:00`) : new Date()}
-          mode="time"
-          is24Hour
-          display="default"
-          onChange={(event, selected) => handleTimeChange(setIfrActual, setShowIfrActualPicker, event, selected)}
-        />
-      ) : null}
-      {showCrossCountryPicker ? (
-        <DateTimePicker
-          value={crossCountryTotal ? new Date(`2000-01-01T${crossCountryTotal}:00`) : new Date()}
-          mode="time"
-          is24Hour
-          display="default"
-          onChange={(event, selected) =>
-            handleTimeChange(setCrossCountryTotal, setShowCrossCountryPicker, event, selected)
-          }
-        />
-      ) : null}
-      {showInstrumentPicker ? (
-        <DateTimePicker
-          value={instrumentTimings ? new Date(`2000-01-01T${instrumentTimings}:00`) : new Date()}
-          mode="time"
-          is24Hour
-          display="default"
-          onChange={(event, selected) =>
-            handleTimeChange(setInstrumentTimings, setShowInstrumentPicker, event, selected)
-          }
-        />
-      ) : null}
-      {showIfrSimulatedPicker ? (
-        <DateTimePicker
-          value={ifrSimulated ? new Date(`2000-01-01T${ifrSimulated}:00`) : new Date()}
-          mode="time"
-          is24Hour
-          display="default"
-          onChange={(event, selected) =>
-            handleTimeChange(setIfrSimulated, setShowIfrSimulatedPicker, event, selected)
-          }
-        />
-      ) : null}
     </SafeAreaView>
   );
 }

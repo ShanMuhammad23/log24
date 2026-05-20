@@ -10,8 +10,8 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { OrganizationAutocompleteField } from '@/components/profile/OrganizationAutocompleteField';
 import {
-  ORGANIZATION_OPTIONS,
   DEFAULT_CAPACITY_OPTIONS,
   DefaultCapacity,
   LICENSE_TYPE_OPTIONS,
@@ -76,12 +76,6 @@ function SelectField({ label, value, options, onSelect }: SelectFieldProps) {
   );
 }
 
-type OrganizationFieldProps = {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-};
-
 function ProfileEditSkeleton() {
   return (
     <View>
@@ -93,86 +87,6 @@ function ProfileEditSkeleton() {
       ))}
       <View className="mb-3 h-5 w-52 rounded bg-slate-800" />
       <View className="mt-3 h-12 rounded-xl bg-slate-800" />
-    </View>
-  );
-}
-
-function OrganizationField({ label, value, onChange }: OrganizationFieldProps) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
-
-  const filteredOptions = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) return ORGANIZATION_OPTIONS;
-    return ORGANIZATION_OPTIONS.filter((option) => option.label.toLowerCase().includes(normalizedQuery));
-  }, [query]);
-
-  return (
-    <View className="mb-4">
-      <Text className="mb-2 text-sm font-semibold text-slate-300">{label}</Text>
-      <View className="flex-row items-center gap-2">
-        <TextInput
-          value={value}
-          onChangeText={onChange}
-          placeholder="Enter organization"
-          placeholderTextColor="#64748b"
-          className="flex-1 rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-base text-white"
-        />
-        <Pressable
-          onPress={() => setOpen(true)}
-          className="h-12 w-12 items-center justify-center rounded-xl border border-slate-700 bg-slate-900">
-          <FontAwesome name="chevron-down" size={13} color="#94a3b8" />
-        </Pressable>
-      </View>
-
-      <Modal
-        visible={open}
-        transparent
-        animationType="slide"
-        onRequestClose={() => {
-          setOpen(false);
-          setQuery('');
-        }}>
-        <View className="flex-1 justify-end bg-black/60">
-          <View className="max-h-[70%] rounded-t-2xl bg-slate-900 px-4 pb-6 pt-4">
-            <View className="mb-2 flex-row items-center justify-between">
-              <Text className="text-lg font-bold text-white">{label}</Text>
-              <Pressable
-                onPress={() => {
-                  setOpen(false);
-                  setQuery('');
-                }}>
-                <Text className="text-sm font-semibold text-blue-400">Close</Text>
-              </Pressable>
-            </View>
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Search organizations"
-              placeholderTextColor="#64748b"
-              className="mb-2 rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-base text-white"
-            />
-            <ScrollView>
-              {filteredOptions.map((option) => (
-                <Pressable
-                  key={option.value}
-                  onPress={() => {
-                    onChange(option.value);
-                    setOpen(false);
-                    setQuery('');
-                  }}
-                  className="flex-row items-center justify-between border-b border-slate-800 py-4">
-                  <Text className="text-base text-slate-100">{option.label}</Text>
-                  {option.value === value ? <FontAwesome name="check" size={14} color="#60a5fa" /> : null}
-                </Pressable>
-              ))}
-              {filteredOptions.length === 0 ? (
-                <Text className="py-4 text-center text-sm text-slate-400">No organizations found</Text>
-              ) : null}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -263,7 +177,10 @@ export default function ProfileEditScreen() {
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-slate-950">
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 28 }}>
+      <ScrollView
+        className="flex-1"
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 28 }}>
         <View className="mb-5 flex-row items-center justify-between">
           <View className="flex-row items-center gap-3">
             <Pressable onPress={() => router.back()} className="h-10 w-10 items-center justify-center rounded-full bg-slate-800">
@@ -305,10 +222,11 @@ export default function ProfileEditScreen() {
               onSelect={(value) => setDefaultOperatingCapacity(value as DefaultCapacity)}
             />
 
-            <OrganizationField
+            <OrganizationAutocompleteField
               label="Airline / GA / Flight School"
               value={organization}
               onChange={setOrganization}
+              placeholder="Type to search organizations"
             />
 
             <SelectField

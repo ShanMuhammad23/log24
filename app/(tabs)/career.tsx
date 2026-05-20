@@ -4,7 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FloatingLogButton } from '@/components/home/FloatingLogButton';
 import { useSupabaseSession } from '@/utils/auth';
-import { fetchCareerTotals, FlightTotalsRow } from '@/utils/career';
+import { aggregateFlightTotals, fetchCareerTotals, FlightTotalsRow } from '@/utils/career';
 
 function toHours(minutes: number) {
   const h = Math.floor(minutes / 60);
@@ -87,49 +87,7 @@ export default function CareerScreen() {
     load();
   }, [session?.user?.id]);
 
-  const totals = useMemo(() => {
-    const total = rows.reduce((acc, row) => acc + (row.block_time_minutes || 0), 0);
-    const pic = rows.reduce((acc, row) => acc + (row.pic_time_minutes || 0), 0);
-    const copilot = rows.reduce((acc, row) => acc + (row.sic_time_minutes || 0), 0);
-    const dual = rows.reduce((acc, row) => {
-      if (row.operating_capacity === 'dual') return acc + (row.block_time_minutes || 0);
-      return acc;
-    }, 0);
-    const instruction = rows.reduce((acc, row) => {
-      if (row.operating_capacity === 'instructor') return acc + (row.block_time_minutes || 0);
-      return acc;
-    }, 0);
-    const crossCountry = rows.reduce((acc, row) => {
-      if ((row.cross_country_total_minutes || 0) > 0) return acc + (row.cross_country_total_minutes || 0);
-      if (row.is_cross_country) return acc + (row.block_time_minutes || 0);
-      return acc;
-    }, 0);
-    const simulator = rows.reduce((acc, row) => acc + (row.ifr_simulated_minutes || 0), 0);
-    const night = rows.reduce((acc, row) => acc + (row.night_time_minutes || 0), 0);
-    const ifrDual = simulator;
-    const multiEngine = rows.reduce((acc, row) => acc + (row.instrument_time_minutes || 0), 0);
-    const nightDual = Math.min(night, dual);
-    const nightSolo = Math.max(night - nightDual, 0);
-    const cplTarget = 200 * 60;
-    const remaining = Math.max(cplTarget - total, 0);
-    const progress = percentFromMinutes(total, cplTarget);
-
-    return {
-      total,
-      pic,
-      copilot,
-      dual,
-      instruction,
-      crossCountry,
-      night,
-      ifrDual,
-      multiEngine,
-      nightDual,
-      nightSolo,
-      remaining,
-      progress,
-    };
-  }, [rows]);
+  const totals = useMemo(() => aggregateFlightTotals(rows), [rows]);
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-slate-50">

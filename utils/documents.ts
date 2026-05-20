@@ -1,5 +1,7 @@
 import { supabase } from '@/utils/supabase';
 
+export type DocumentStatus = 'valid' | 'expiring_soon' | 'expired';
+
 export type PilotDocument = {
   id: string;
   user_id: string;
@@ -7,7 +9,7 @@ export type PilotDocument = {
   document_name: string;
   expiry_date: string | null;
   issue_date: string | null;
-  status: 'valid' | 'expiring_soon' | 'expired';
+  status: DocumentStatus;
   file_name: string | null;
   file_path: string | null;
   mime_type?: string | null;
@@ -20,6 +22,46 @@ export type PilotDocument = {
 
 const DOCUMENT_SELECT =
   'id, user_id, document_type, document_name, expiry_date, issue_date, status, file_name, file_path, mime_type, size_bytes, issuer, reminder_days_before, notes, created_at';
+
+/** Parse YYYY-MM-DD in local calendar (avoids UTC date-shift bugs). */
+export function parseLocalDateOnly(value: string) {
+  const [y, m, d] = value.slice(0, 10).split('-').map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+}
+
+/** Whole days from today until expiry (negative = already expired). */
+export function daysUntilExpiry(expiryDate: string | null) {
+  if (!expiryDate) return null;
+  const expiry = parseLocalDateOnly(expiryDate);
+  if (!expiry || Number.isNaN(expiry.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  expiry.setHours(0, 0, 0, 0);
+  return Math.floor((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+export function computeDocumentStatus(
+  expiryDate: string | null,
+  reminderDaysBefore = 15
+): DocumentStatus {
+  const daysLeft = daysUntilExpiry(expiryDate);
+  if (daysLeft === null) return 'valid';
+  if (daysLeft < 0) return 'expired';
+  if (daysLeft <= reminderDaysBefore) return 'expiring_soon';
+  return 'valid';
+}
+
+export function enrichPilotDocument<T extends PilotDocument>(doc: T): T {
+  return {
+    ...doc,
+    status: computeDocumentStatus(doc.expiry_date, doc.reminder_days_before ?? 15),
+  };
+}
+
+export function enrichPilotDocuments(docs: PilotDocument[]) {
+  return docs.map(enrichPilotDocument);
+}
 
 export type CreatePilotDocumentInput = {
   user_id: string;
@@ -37,20 +79,30 @@ export type CreatePilotDocumentInput = {
 };
 
 export async function fetchPilotDocuments(userId: string) {
-  return supabase
+  const result = await supabase
     .from('pilot_documents')
     .select(DOCUMENT_SELECT)
     .eq('user_id', userId)
     .order('expiry_date', { ascending: true, nullsFirst: false });
+
+  if (result.data) {
+    return { ...result, data: enrichPilotDocuments(result.data as PilotDocument[]) };
+  }
+  return result;
 }
 
 export async function fetchPilotDocumentById(userId: string, documentId: string) {
-  return supabase
+  const result = await supabase
     .from('pilot_documents')
     .select(DOCUMENT_SELECT)
     .eq('user_id', userId)
     .eq('id', documentId)
     .maybeSingle<PilotDocument>();
+
+  if (result.data) {
+    return { ...result, data: enrichPilotDocument(result.data) };
+  }
+  return result;
 }
 
 export async function createPilotDocumentSignedUrl(filePath: string, expiresInSeconds = 3600) {
