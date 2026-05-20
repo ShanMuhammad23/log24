@@ -177,9 +177,11 @@ export default function TabLayout() {
           tabBarLabel: 'Calculation',
           tabBarShowLabel: true,
           tabBarIcon: ({ color }) => <TabBarIcon name="calculator" color={color} />,
-          unmountOnBlur: true,
         }}
         listeners={({ navigation }) => ({
+          blur: () => {
+            router.replace('/calculation');
+          },
           tabPress: (e) => {
             const state = navigation.getState();
             const current = state.routes[state.index];
