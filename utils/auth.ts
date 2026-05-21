@@ -1,13 +1,22 @@
 import { useEffect, useState } from 'react';
 import { Session } from '@supabase/supabase-js';
-import { supabase } from '@/utils/supabase';
+import { getSupabase, isSupabaseConfigured } from '@/utils/supabase';
 
 export function useSupabaseSession() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [configMissing, setConfigMissing] = useState(!isSupabaseConfigured());
 
   useEffect(() => {
+    if (!isSupabaseConfigured()) {
+      setConfigMissing(true);
+      setLoading(false);
+      return;
+    }
+
+    setConfigMissing(false);
     let mounted = true;
+    const supabase = getSupabase();
 
     supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return;
@@ -26,5 +35,5 @@ export function useSupabaseSession() {
     };
   }, []);
 
-  return { session, loading };
+  return { session, loading, configMissing };
 }

@@ -49,7 +49,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // null = follow OS when preference is "system"
-    Appearance.setColorScheme(preference === 'system' ? null : preference);
+    try {
+      if (typeof Appearance.setColorScheme === 'function') {
+        Appearance.setColorScheme(preference === 'system' ? null : preference);
+      }
+    } catch {
+      // Some Android release builds do not support programmatic scheme override.
+    }
   }, [preference]);
 
   const setPreference = useCallback(async (pref: ThemePreference) => {

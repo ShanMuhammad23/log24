@@ -23,6 +23,24 @@ import {
   minutesToHHMM,
   type FlightSaveInput,
 } from '@/utils/flight-form';
+import { AirportSearchField } from '@/components/flight-form/AirportSearchField';
+import { SearchablePresetField } from '@/components/flight-form/SearchablePresetField';
+import {
+  addUserSavedAirport,
+  fetchUserSavedAirports,
+  mergeSavedAirport,
+  saveUserAirportByCode,
+  type AirportOption,
+} from '@/utils/airports';
+import {
+  addFlightFieldPreset,
+  emptyFlightFieldPresets,
+  fetchFlightFieldPresets,
+  mergePresetOption,
+  syncFlightFieldPresetsFromForm,
+  type FlightFieldPresetsMap,
+  type FlightFieldType,
+} from '@/utils/flight-field-presets';
 import { DEFAULT_CAPACITY_OPTIONS, getProfile } from '@/utils/profile';
 import { supabase } from '@/utils/supabase';
 
@@ -145,6 +163,8 @@ export default function AddFlightScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [fieldPresets, setFieldPresets] = useState<FlightFieldPresetsMap>(() => emptyFlightFieldPresets());
+  const [savedAirports, setSavedAirports] = useState<AirportOption[]>([]);
 
   const totalTime = useMemo(() => {
     const minutes = blockMinutesFromOutIn(outTime, inTime);
@@ -215,13 +235,49 @@ export default function AddFlightScreen() {
     ]
   );
 
+  const saveAirportForUser = async (airport: AirportOption) => {
+    const userId = session?.user?.id;
+    if (!userId) return { error: 'You are not logged in.' };
+    const { airport: saved, error } = await addUserSavedAirport(userId, airport);
+    if (!error) setSavedAirports((prev) => mergeSavedAirport(prev, saved));
+    return { error };
+  };
+
+  const addFieldPreset = (fieldType: FlightFieldType) => async (raw: string) => {
+    const userId = session?.user?.id;
+    if (!userId) {
+      return { error: 'You are not logged in.' };
+    }
+
+    const { value, error: addError } = await addFlightFieldPreset(userId, fieldType, raw);
+    if (addError) {
+      return { error: addError };
+    }
+
+    setFieldPresets((prev) => ({
+      ...prev,
+      [fieldType]: mergePresetOption(prev[fieldType], value),
+    }));
+    return { error: null };
+  };
+
   useEffect(() => {
     const userId = session?.user?.id;
     if (!userId) {
       setPrefilling(false);
       setLoadingFlight(false);
+      setFieldPresets(emptyFlightFieldPresets());
+      setSavedAirports([]);
       return;
     }
+
+    let presetsCancelled = false;
+    fetchFlightFieldPresets(userId).then((presets) => {
+      if (!presetsCancelled) setFieldPresets(presets);
+    });
+    fetchUserSavedAirports(userId).then((airports) => {
+      if (!presetsCancelled) setSavedAirports(airports);
+    });
 
     if (isEditing && editFlightId) {
       let cancelled = false;
@@ -281,6 +337,7 @@ export default function AddFlightScreen() {
       loadFlight();
       return () => {
         cancelled = true;
+        presetsCancelled = true;
       };
     }
 
@@ -325,6 +382,7 @@ export default function AddFlightScreen() {
 
     return () => {
       cancelled = true;
+      presetsCancelled = true;
     };
   }, [editFlightId, isEditing, session?.user?.id]);
 
@@ -375,6 +433,21 @@ export default function AddFlightScreen() {
       return;
     }
 
+    await syncFlightFieldPresetsFromForm(userId, {
+      flight_number: flightNo,
+      aircraft_registration: registration,
+      aircraft_type: aircraftType,
+      pic_name: picName,
+      co_pilot_name: coPilotName,
+    });
+    await Promise.all([saveUserAirportByCode(userId, from), saveUserAirportByCode(userId, to)]);
+    const [refreshed, refreshedAirports] = await Promise.all([
+      fetchFlightFieldPresets(userId),
+      fetchUserSavedAirports(userId),
+    ]);
+    setFieldPresets(refreshed);
+    setSavedAirports(refreshedAirports);
+
     setSuccess(isEditing ? 'Flight updated successfully.' : 'Flight saved successfully.');
     if (isEditing) {
       router.back();
@@ -413,19 +486,56 @@ export default function AddFlightScreen() {
         </FieldRow>
 
         <FieldRow label="Flight No.">
-          <TextField value={flightNo} onChangeText={setFlightNo} placeholder="e.g. AI302" />
+          <SearchablePresetField
+            value={flightNo}
+            onChange={setFlightNo}
+            options={fieldPresets.flight_number}
+            placeholder="e.g. AI302"
+            onAddNew={addFieldPreset('flight_number')}
+            autoCapitalize="characters"
+          />
         </FieldRow>
         <FieldRow label="Registration" required>
-          <TextField value={registration} onChangeText={setRegistration} placeholder="e.g. VT-ABC" autoCapitalize="characters" />
+          <SearchablePresetField
+            value={registration}
+            onChange={setRegistration}
+            options={fieldPresets.aircraft_registration}
+            placeholder="e.g. VT-ABC"
+            onAddNew={addFieldPreset('aircraft_registration')}
+            autoCapitalize="characters"
+          />
         </FieldRow>
         <FieldRow label="A/c Type" required>
-          <TextField value={aircraftType} onChangeText={setAircraftType} placeholder="e.g. DA40" autoCapitalize="characters" />
+          <SearchablePresetField
+            value={aircraftType}
+            onChange={setAircraftType}
+            options={fieldPresets.aircraft_type}
+            placeholder="e.g. DA40"
+            onAddNew={addFieldPreset('aircraft_type')}
+            autoCapitalize="characters"
+          />
         </FieldRow>
         <FieldRow label="From" required>
-          <TextField value={from} onChangeText={setFrom} placeholder="Departure" autoCapitalize="characters" />
+          <AirportSearchField
+            value={from}
+            onChange={setFrom}
+            placeholder="ICAO / IATA — e.g. VIDP"
+            userId={session?.user?.id}
+            savedAirports={savedAirports}
+            onSavedAirportsChange={setSavedAirports}
+            onSaveAirport={saveAirportForUser}
+          />
         </FieldRow>
         <FieldRow label="To" required>
-          <TextField value={to} onChangeText={setTo} placeholder="Arrival" autoCapitalize="characters" />
+          <AirportSearchField
+            value={to}
+            onChange={setTo}
+            placeholder="ICAO / IATA — e.g. VABB"
+            userId={session?.user?.id}
+            savedAirports={savedAirports}
+            onSavedAirportsChange={setSavedAirports}
+            onSaveAirport={saveAirportForUser}
+          />
         </FieldRow>
 
         <FieldRow label="Operating Capacity" required>
@@ -451,10 +561,24 @@ export default function AddFlightScreen() {
         </View>
 
         <FieldRow label="PIC Name" required>
-          <TextField value={picName} onChangeText={setPicName} placeholder="Pilot in command" autoCapitalize="words" />
+          <SearchablePresetField
+            value={picName}
+            onChange={setPicName}
+            options={fieldPresets.pic_name}
+            placeholder="Pilot in command"
+            onAddNew={addFieldPreset('pic_name')}
+            autoCapitalize="words"
+          />
         </FieldRow>
         <FieldRow label="Co Pilot">
-          <TextField value={coPilotName} onChangeText={setCoPilotName} placeholder="Instructor / co-pilot" autoCapitalize="words" />
+          <SearchablePresetField
+            value={coPilotName}
+            onChange={setCoPilotName}
+            options={fieldPresets.co_pilot_name}
+            placeholder="Instructor / co-pilot"
+            onAddNew={addFieldPreset('co_pilot_name')}
+            autoCapitalize="words"
+          />
         </FieldRow>
 
         <View className="mb-4 flex-row gap-2">

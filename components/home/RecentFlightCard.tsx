@@ -36,9 +36,9 @@ export function RecentFlightCard({ flight, onPress }: RecentFlightCardProps) {
               <View className="h-9 w-9 items-center justify-center rounded-full bg-blue-50">
                 <FontAwesome name="plane" size={14} color="#2563eb" />
               </View>
-              <Text className="text-2xl font-semibold text-slate-800 dark:text-slate-100">{flight.aircraft}</Text>
+              <Text className="text-lg font-semibold text-slate-800 dark:text-slate-100">{flight.aircraftTag}</Text>
               <View className="rounded-full bg-blue-50 px-2 py-0.5 dark:bg-blue-900/30">
-                <Text className="text-[11px] font-medium text-blue-700">{flight.aircraftTag}</Text>
+                <Text className="text-[11px] font-medium text-blue-700">{flight.aircraft}</Text>
               </View>
             </View>
             <FontAwesome name="angle-right" size={18} color="#94a3b8" />
