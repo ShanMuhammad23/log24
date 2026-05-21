@@ -1,6 +1,6 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
+import { DocumentDateField } from '@/components/documents/DocumentDateField';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
@@ -14,13 +14,6 @@ import {
   updatePilotDocument,
 } from '@/utils/documents';
 import { supabase } from '@/utils/supabase';
-
-function formatDateISO(dateValue: Date) {
-  const y = dateValue.getFullYear();
-  const m = String(dateValue.getMonth() + 1).padStart(2, '0');
-  const d = String(dateValue.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
 
 export default function AddDocumentScreen() {
   const router = useRouter();
@@ -41,9 +34,6 @@ export default function AddDocumentScreen() {
   const [loading, setLoading] = useState(Boolean(editId));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showIssuePicker, setShowIssuePicker] = useState(false);
-  const [showExpiryPicker, setShowExpiryPicker] = useState(false);
-
   useEffect(() => {
     if (!editId || !session?.user?.id) {
       setLoading(false);
@@ -80,20 +70,6 @@ export default function AddDocumentScreen() {
       cancelled = true;
     };
   }, [editId, session?.user?.id]);
-
-  const onDateChange = (
-    picker: 'issue' | 'expiry',
-    _event: DateTimePickerEvent,
-    selectedDate?: Date
-  ) => {
-    if (picker === 'issue') setShowIssuePicker(false);
-    if (picker === 'expiry') setShowExpiryPicker(false);
-    if (!selectedDate) return;
-
-    const formatted = formatDateISO(selectedDate);
-    if (picker === 'issue') setIssueDate(formatted);
-    if (picker === 'expiry') setExpiryDate(formatted);
-  };
 
   const uploadFile = async (userId: string) => {
     if (!selectedFile) return { path: null as string | null, error: null as string | null };
@@ -291,28 +267,8 @@ export default function AddDocumentScreen() {
         </View>
 
         <View className="mb-4 flex-row gap-3">
-          <View className="flex-1">
-            <Text className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Issue Date</Text>
-            <Pressable
-              onPress={() => setShowIssuePicker(true)}
-              className="flex-row items-center justify-between rounded-xl border border-slate-300 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900">
-              <Text className={issueDate ? 'text-slate-900 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400'}>
-                {issueDate || 'YYYY-MM-DD'}
-              </Text>
-              <FontAwesome name="calendar" size={15} color="#64748b" />
-            </Pressable>
-          </View>
-          <View className="flex-1">
-            <Text className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Expiry Date</Text>
-            <Pressable
-              onPress={() => setShowExpiryPicker(true)}
-              className="flex-row items-center justify-between rounded-xl border border-slate-300 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900">
-              <Text className={expiryDate ? 'text-slate-900 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400'}>
-                {expiryDate || 'YYYY-MM-DD'}
-              </Text>
-              <FontAwesome name="calendar" size={15} color="#64748b" />
-            </Pressable>
-          </View>
+          <DocumentDateField label="Issue Date" value={issueDate} onChange={setIssueDate} />
+          <DocumentDateField label="Expiry Date" value={expiryDate} onChange={setExpiryDate} />
         </View>
 
         <View className="mb-4">
@@ -383,23 +339,6 @@ export default function AddDocumentScreen() {
           )}
         </Pressable>
       </ScrollView>
-
-      {showIssuePicker ? (
-        <DateTimePicker
-          value={issueDate ? new Date(`${issueDate}T00:00:00`) : new Date()}
-          mode="date"
-          display="default"
-          onChange={(event, selected) => onDateChange('issue', event, selected)}
-        />
-      ) : null}
-      {showExpiryPicker ? (
-        <DateTimePicker
-          value={expiryDate ? new Date(`${expiryDate}T00:00:00`) : new Date()}
-          mode="date"
-          display="default"
-          onChange={(event, selected) => onDateChange('expiry', event, selected)}
-        />
-      ) : null}
     </SafeAreaView>
   );
 }

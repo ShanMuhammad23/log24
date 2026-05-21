@@ -81,7 +81,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <ThemeContext.Provider value={value}>
-      <View className={`flex-1 ${resolvedScheme === 'dark' ? 'dark' : ''}`}>{children}</View>
+      <View className={`flex-1 font-sans ${resolvedScheme === 'dark' ? 'dark' : ''}`}>{children}</View>
     </ThemeContext.Provider>
   );
 }

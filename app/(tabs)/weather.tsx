@@ -47,15 +47,17 @@ export default function WeatherScreen() {
   };
 
   return (
-    <SafeAreaView edges={['top']} className="flex-1 bg-slate-950">
+    <SafeAreaView edges={['top']} className="flex-1 bg-slate-50 dark:bg-slate-950">
       <ScrollView
         className="flex-1"
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 28 }}>
-        <Text className="mb-1 text-2xl font-bold text-white">Weather</Text>
-        <Text className="mb-5 text-sm text-slate-400">Airport METAR &amp; TAF from Aviation Weather</Text>
+        <Text className="mb-1 text-2xl font-bold text-slate-900 dark:text-white">Weather</Text>
+        <Text className="mb-5 text-sm text-slate-500 dark:text-slate-400">
+          Airport METAR &amp; TAF from Aviation Weather
+        </Text>
 
-        <Text className="mb-2 text-sm font-medium text-slate-300">Station ID (ICAO)</Text>
+        <Text className="mb-2 text-sm font-medium text-slate-600 dark:text-slate-300">Station ID (ICAO)</Text>
         <View className="flex-row gap-2">
           <TextInput
             value={stationId}
@@ -65,7 +67,7 @@ export default function WeatherScreen() {
             autoCapitalize="characters"
             autoCorrect={false}
             maxLength={8}
-            className="h-12 flex-1 rounded-xl border border-slate-700 bg-slate-900 px-4 text-base text-white"
+            className="h-12 flex-1 rounded-xl border border-slate-300 bg-white px-4 text-base text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
             onSubmitEditing={handleFetch}
             returnKeyType="search"
           />
@@ -81,12 +83,12 @@ export default function WeatherScreen() {
           </Pressable>
         </View>
 
-        {error ? <Text className="mt-3 text-sm text-red-400">{error}</Text> : null}
+        {error ? <Text className="mt-3 text-sm text-red-500 dark:text-red-400">{error}</Text> : null}
 
         {loading ? (
           <View className="mt-10 items-center">
-            <ActivityIndicator size="large" color="#60a5fa" />
-            <Text className="mt-3 text-sm text-slate-400">Fetching report…</Text>
+            <ActivityIndicator size="large" color="#2563eb" />
+            <Text className="mt-3 text-sm text-slate-500 dark:text-slate-400">Fetching report…</Text>
           </View>
         ) : null}
 
@@ -99,7 +101,7 @@ export default function WeatherScreen() {
           : null}
 
         {!loading && hasSearched && reports.length === 0 && !error ? (
-          <Text className="mt-6 text-center text-sm text-slate-500">No data to display.</Text>
+          <Text className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">No data to display.</Text>
         ) : null}
       </ScrollView>
     </SafeAreaView>

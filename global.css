@@ -1,6 +1,36 @@
+@import url('https://fonts.googleapis.com/css2?family=Familjen+Grotesk:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  body,
+  #root {
+    font-family: 'Familjen Grotesk', system-ui, sans-serif;
+  }
+}
+
+/* Web: Google Fonts weights; native uses font files via tailwind.config.js */
+@layer utilities {
+  .font-sans,
+  .font-normal {
+    font-family: 'Familjen Grotesk', system-ui, sans-serif;
+    font-weight: 400;
+  }
+  .font-medium {
+    font-family: 'Familjen Grotesk', system-ui, sans-serif;
+    font-weight: 500;
+  }
+  .font-semibold {
+    font-family: 'Familjen Grotesk', system-ui, sans-serif;
+    font-weight: 600;
+  }
+  .font-bold {
+    font-family: 'Familjen Grotesk', system-ui, sans-serif;
+    font-weight: 700;
+  }
+}
 
 :root {
   --radius: 0.625rem;

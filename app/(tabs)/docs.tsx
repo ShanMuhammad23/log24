@@ -8,7 +8,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { DocsContentSkeleton, DocsStatsSkeleton } from '@/components/docs/DocsContentSkeleton';
 import { useSupabaseSession } from '@/utils/auth';
 import { consumeDocsReturnPreview, mergeDocumentsWithPreview } from '@/utils/docs-navigation';
-import { daysUntilExpiry, deletePilotDocument, fetchPilotDocuments, PilotDocument } from '@/utils/documents';
+import {
+  daysUntilExpiry,
+  deletePilotDocument,
+  documentErrorMessage,
+  fetchPilotDocuments,
+  PilotDocument,
+} from '@/utils/documents';
 
 type FilterTab = 'all' | 'expiring_soon' | 'expired' | 'valid';
 
@@ -153,10 +159,9 @@ function DocumentActionsModal({
 }) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable className="flex-1 justify-end bg-black/40" onPress={onClose}>
-        <Pressable
-          onPress={(event) => event.stopPropagation()}
-          className="rounded-t-3xl bg-white px-4 pb-8 pt-3 dark:bg-slate-900">
+      <View className="flex-1 justify-end">
+        <Pressable className="absolute inset-0 bg-black/40" onPress={onClose} accessibilityLabel="Close menu" />
+        <View className="rounded-t-3xl bg-white px-4 pb-8 pt-3 dark:bg-slate-900">
           <View className="mb-4 h-1 w-10 self-center rounded-full bg-slate-300 dark:bg-slate-600" />
           <Text className="mb-4 text-center text-base font-semibold text-slate-900 dark:text-slate-100" numberOfLines={2}>
             {documentName}
@@ -179,8 +184,8 @@ function DocumentActionsModal({
           <Pressable onPress={onClose} className="mt-3 items-center py-3">
             <Text className="text-base font-medium text-slate-500 dark:text-slate-400">Cancel</Text>
           </Pressable>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }
@@ -250,29 +255,39 @@ export default function DocsScreen() {
   };
 
   const confirmDelete = (doc: PilotDocument) => {
+    const docId = doc.id;
+    const docName = doc.document_name;
+
     setActionDoc(null);
-    Alert.alert('Delete Document', `Delete "${doc.document_name}"? This cannot be undone.`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          const userId = session?.user?.id;
-          if (!userId) return;
 
-          setDeletingId(doc.id);
-          const { error } = await deletePilotDocument(userId, doc.id);
-          setDeletingId(null);
+    // Alert after modal closes (Android often blocks Alert while a Modal is visible).
+    requestAnimationFrame(() => {
+      Alert.alert('Delete Document', `Delete "${docName}"? This cannot be undone.`, [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const userId = session?.user?.id;
+            if (!userId) {
+              Alert.alert('Delete failed', 'You are not logged in.');
+              return;
+            }
 
-          if (error) {
-            Alert.alert('Delete failed', error.message);
-            return;
-          }
+            setDeletingId(docId);
+            const { error } = await deletePilotDocument(userId, docId);
+            setDeletingId(null);
 
-          setDocuments((prev) => prev.filter((item) => item.id !== doc.id));
+            if (error) {
+              Alert.alert('Delete failed', documentErrorMessage(error));
+              return;
+            }
+
+            setDocuments((prev) => prev.filter((item) => item.id !== docId));
+          },
         },
-      },
-    ]);
+      ]);
+    });
   };
 
   return (
@@ -388,10 +403,12 @@ export default function DocsScreen() {
           documentName={actionDoc?.document_name || ''}
           onClose={() => setActionDoc(null)}
           onEdit={() => {
-            if (actionDoc) openEdit(actionDoc);
+            if (!actionDoc) return;
+            openEdit(actionDoc);
           }}
           onDelete={() => {
-            if (actionDoc) confirmDelete(actionDoc);
+            if (!actionDoc) return;
+            confirmDelete(actionDoc);
           }}
         />
       </View>

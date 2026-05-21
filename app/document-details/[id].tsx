@@ -16,6 +16,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSupabaseSession } from '@/utils/auth';
 import {
   createPilotDocumentSignedUrl,
+  deletePilotDocument,
+  documentErrorMessage,
   fetchPilotDocumentById,
   daysUntilExpiry,
   formatDocumentFileSize,
@@ -70,6 +72,7 @@ export default function DocumentDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [openingFile, setOpeningFile] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -116,6 +119,29 @@ export default function DocumentDetailsScreen() {
       cancelled = true;
     };
   }, [id, session?.user?.id]);
+
+  const handleDelete = () => {
+    const userId = session?.user?.id;
+    if (!userId || !document) return;
+
+    Alert.alert('Delete Document', `Delete "${document.document_name}"? This cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          setDeleting(true);
+          const { error } = await deletePilotDocument(userId, document.id);
+          setDeleting(false);
+          if (error) {
+            Alert.alert('Delete failed', documentErrorMessage(error));
+            return;
+          }
+          router.replace('/(tabs)/docs');
+        },
+      },
+    ]);
+  };
 
   const openFileExternally = async () => {
     if (!fileUrl) {
@@ -245,6 +271,24 @@ export default function DocumentDetailsScreen() {
               ) : (
                 <Text className="text-sm text-slate-500">No file was uploaded for this document.</Text>
               )}
+            </View>
+
+            <View className="mt-4 flex-row gap-3">
+              <Pressable
+                onPress={() => router.push({ pathname: '/add-document', params: { id: document.id } })}
+                className="flex-1 items-center rounded-xl border border-slate-200 bg-white py-3.5 active:bg-slate-50">
+                <Text className="text-base font-semibold text-blue-600">Edit</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleDelete}
+                disabled={deleting}
+                className="flex-1 items-center rounded-xl border border-red-200 bg-red-50 py-3.5 active:bg-red-100 disabled:opacity-60">
+                {deleting ? (
+                  <ActivityIndicator color="#dc2626" />
+                ) : (
+                  <Text className="text-base font-semibold text-red-600">Delete</Text>
+                )}
+              </Pressable>
             </View>
           </Animated.View>
         ) : null}

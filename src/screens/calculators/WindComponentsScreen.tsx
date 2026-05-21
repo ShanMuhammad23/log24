@@ -6,10 +6,11 @@ import CalculatorSafeArea from './components/CalculatorSafeArea';
 import CalcInput from './components/CalcInput';
 import CalcResult from './components/CalcResult';
 import { fmt, parseNum, toRad } from './utils';
-import { sharedStyles } from './theme';
+import { useCalculatorTheme } from './theme';
 
 const WindComponentsScreen: React.FC = () => {
   const router = useRouter();
+  const { styles: sharedStyles } = useCalculatorTheme();
   const [windDir, setWindDir] = useState<string>('');
   const [windSpeed, setWindSpeed] = useState<string>('');
   const [runwayHeading, setRunwayHeading] = useState<string>('');

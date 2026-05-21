@@ -7,10 +7,11 @@ import CalcInput from './components/CalcInput';
 import CalcResult from './components/CalcResult';
 import type { MachMode } from './types';
 import { fmt, parseNum } from './utils';
-import { sharedStyles } from './theme';
+import { useCalculatorTheme } from './theme';
 
 const MachSpeedScreen: React.FC = () => {
   const router = useRouter();
+  const { styles: sharedStyles } = useCalculatorTheme();
   const [mode, setMode] = useState<MachMode>('TAStoMach');
   const [altitude, setAltitude] = useState<string>('');
   const [tas, setTas] = useState<string>('');

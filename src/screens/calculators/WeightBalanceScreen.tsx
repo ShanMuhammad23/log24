@@ -7,7 +7,7 @@ import CalcInput from './components/CalcInput';
 import CalcResult from './components/CalcResult';
 import type { WBItem } from './types';
 import { fmt, parseNum } from './utils';
-import { colors, sharedStyles } from './theme';
+import { useCalculatorTheme } from './theme';
 
 function newItem(index: number): WBItem {
   return { id: `${Date.now()}-${index}`, name: `Item ${index}`, weight: '', arm: '' };
@@ -15,6 +15,7 @@ function newItem(index: number): WBItem {
 
 const WeightBalanceScreen: React.FC = () => {
   const router = useRouter();
+  const { styles: sharedStyles, colors } = useCalculatorTheme();
   const [items, setItems] = useState<WBItem[]>([newItem(1), newItem(2)]);
   const [fwdLimit, setFwdLimit] = useState<string>('');
   const [aftLimit, setAftLimit] = useState<string>('');
@@ -34,6 +35,44 @@ const WeightBalanceScreen: React.FC = () => {
   const updateItem = (id: string, field: keyof WBItem, value: string): void => {
     setItems((prev) => prev.map((item) => (item.id === id ? { ...item, [field]: value } : item)));
   };
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        itemHeader: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        },
+        remove: {
+          color: colors.error,
+          fontSize: 13,
+          fontWeight: '600',
+        },
+        add: {
+          alignItems: 'center',
+          paddingVertical: 12,
+        },
+        addText: {
+          color: colors.accent,
+          fontSize: 15,
+          fontWeight: '600',
+        },
+        status: {
+          marginTop: 16,
+          fontSize: 18,
+          fontWeight: '700',
+          textAlign: 'center',
+        },
+        statusOk: {
+          color: colors.success,
+        },
+        statusBad: {
+          color: colors.danger,
+        },
+      }),
+    [colors]
+  );
 
   return (
     <CalculatorSafeArea>
@@ -90,39 +129,5 @@ const WeightBalanceScreen: React.FC = () => {
     </CalculatorSafeArea>
   );
 };
-
-const styles = StyleSheet.create({
-  itemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  remove: {
-    color: colors.error,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  add: {
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  addText: {
-    color: colors.accent,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  status: {
-    marginTop: 16,
-    fontSize: 18,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  statusOk: {
-    color: colors.success,
-  },
-  statusBad: {
-    color: colors.danger,
-  },
-});
 
 export default WeightBalanceScreen;

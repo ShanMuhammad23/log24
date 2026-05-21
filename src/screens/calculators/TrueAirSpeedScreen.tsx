@@ -6,10 +6,11 @@ import CalculatorSafeArea from './components/CalculatorSafeArea';
 import CalcInput from './components/CalcInput';
 import CalcResult from './components/CalcResult';
 import { fmt, parseNum } from './utils';
-import { sharedStyles } from './theme';
+import { useCalculatorTheme } from './theme';
 
 const TrueAirSpeedScreen: React.FC = () => {
   const router = useRouter();
+  const { styles: sharedStyles } = useCalculatorTheme();
   const [ias, setIas] = useState<string>('');
   const [pressureAlt, setPressureAlt] = useState<string>('');
   const [oat, setOat] = useState<string>('');

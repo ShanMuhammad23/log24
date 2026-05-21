@@ -88,7 +88,7 @@ function FieldRow({
 }) {
   return (
     <View className="mb-3 flex-row items-center gap-3">
-      <Text className="w-36 text-sm font-semibold text-slate-300">
+      <Text className="w-36 text-sm font-semibold text-slate-600 dark:text-slate-300">
         {label}
         {required ? ' *' : ''}
       </Text>
@@ -118,7 +118,7 @@ function TextField({
       placeholderTextColor="#64748b"
       autoCapitalize={autoCapitalize}
       keyboardType={keyboardType}
-      className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-base text-white"
+      className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
     />
   );
 }
@@ -131,7 +131,7 @@ export default function AddFlightScreen() {
   const [loadingFlight, setLoadingFlight] = useState(Boolean(editFlightId));
   const [prefilling, setPrefilling] = useState(!isEditing);
 
-  const [date, setDate] = useState(() => formatDateISO(new Date()));
+  const [date, setDate] = useState(() => (isEditing ? '' : formatDateISO(new Date())));
   const [flightNo, setFlightNo] = useState('');
   const [registration, setRegistration] = useState('');
   const [aircraftType, setAircraftType] = useState('');
@@ -459,19 +459,25 @@ export default function AddFlightScreen() {
   const busy = loadingFlight || prefilling;
 
   return (
-    <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-slate-950">
+    <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-slate-50 dark:bg-slate-950">
       <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 30 }}>
         <View className="mb-5 flex-row items-center gap-3">
-          <Pressable onPress={() => router.back()} className="h-10 w-10 items-center justify-center rounded-full bg-slate-800">
-            <FontAwesome name="angle-left" size={18} color="#e2e8f0" />
+          <Pressable
+            onPress={() => router.back()}
+            className="h-10 w-10 items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800">
+            <FontAwesome name="angle-left" size={18} color="#64748b" />
           </Pressable>
-          <Text className="text-2xl font-bold text-white">{isEditing ? 'Edit Flight' : 'Log Flight'}</Text>
+          <Text className="text-2xl font-bold text-slate-900 dark:text-white">
+            {isEditing ? 'Edit Flight' : 'Log Flight'}
+          </Text>
         </View>
 
         {busy ? (
           <View className="mb-4 items-center py-8">
             <ActivityIndicator color="#60a5fa" />
-            <Text className="mt-3 text-sm text-slate-400">{isEditing ? 'Loading flight...' : 'Preparing form...'}</Text>
+            <Text className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+              {isEditing ? 'Loading flight...' : 'Preparing form...'}
+            </Text>
           </View>
         ) : null}
 
@@ -481,7 +487,7 @@ export default function AddFlightScreen() {
             onChangeText={setDate}
             placeholder="YYYY-MM-DD"
             placeholderTextColor="#64748b"
-            className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-base text-white"
+            className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
           />
         </FieldRow>
 
@@ -541,8 +547,9 @@ export default function AddFlightScreen() {
         <FieldRow label="Operating Capacity" required>
           <Pressable
             onPress={() => setCapacityOpen(true)}
-            className="flex-row items-center justify-between rounded-xl border border-slate-700 bg-slate-900 px-4 py-3">
-            <Text className={`text-base ${operatingCapacity ? 'text-white' : 'text-slate-500'}`}>
+            className="flex-row items-center justify-between rounded-xl border border-slate-300 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900">
+            <Text
+              className={`text-base ${operatingCapacity ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>
               {DEFAULT_CAPACITY_OPTIONS.find((c) => c.value === operatingCapacity)?.label || 'Select capacity'}
             </Text>
             <FontAwesome name="chevron-down" size={13} color="#94a3b8" />
@@ -555,9 +562,11 @@ export default function AddFlightScreen() {
         <FieldRow label="In Time">
           <TextField value={inTime} onChangeText={setInTime} placeholder="HH:MM or 1030" keyboardType="numeric" />
         </FieldRow>
-        <View className="mb-4 ml-[9.75rem] rounded-xl border border-blue-900/50 bg-blue-950/40 px-4 py-2.5">
-          <Text className="text-xs font-semibold uppercase tracking-wide text-blue-300">Total block time</Text>
-          <Text className="mt-0.5 text-2xl font-bold text-blue-200">{totalTime}</Text>
+        <View className="mb-4 ml-[9.75rem] rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 dark:border-blue-900/50 dark:bg-blue-950/40">
+          <Text className="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
+            Total block time
+          </Text>
+          <Text className="mt-0.5 text-2xl font-bold text-blue-800 dark:text-blue-200">{totalTime}</Text>
         </View>
 
         <FieldRow label="PIC Name" required>
@@ -588,14 +597,16 @@ export default function AddFlightScreen() {
             ['Go Around', goArounds, setGoArounds],
           ].map(([label, value, setter]) => (
             <View key={label as string} className="flex-1">
-              <Text className="mb-1.5 text-xs font-semibold uppercase text-slate-400">{label as string}</Text>
+              <Text className="mb-1.5 text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">
+                {label as string}
+              </Text>
               <TextInput
                 value={value as string}
                 onChangeText={setter as (v: string) => void}
                 keyboardType="number-pad"
                 placeholder="0"
                 placeholderTextColor="#64748b"
-                className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-3 text-center text-base text-white"
+                className="rounded-xl border border-slate-300 bg-white px-3 py-3 text-center text-base text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
               />
             </View>
           ))}
@@ -626,7 +637,7 @@ export default function AddFlightScreen() {
           <TextField value={remarks} onChangeText={setRemarks} placeholder="Any notes" />
         </FieldRow>
 
-        <View className="mb-5 rounded-xl border border-slate-700 bg-slate-900 px-4 py-3">
+        <View className="mb-5 rounded-xl border border-slate-300 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900">
           {[
             ['Cross country flight', isCrossCountry, setIsCrossCountry],
             ['PF (actual T/O + LDG)', pfTakeoffLanding, setPfTakeoffLanding],
@@ -635,7 +646,7 @@ export default function AddFlightScreen() {
             ['ULR ops', ulrOps, setUlrOps],
           ].map(([label, value, setter]) => (
             <View key={label as string} className="mb-2 flex-row items-center justify-between last:mb-0">
-              <Text className="text-sm font-medium text-slate-200">{label as string}</Text>
+              <Text className="text-sm font-medium text-slate-700 dark:text-slate-200">{label as string}</Text>
               <Switch
                 value={value as boolean}
                 onValueChange={setter as (v: boolean) => void}
@@ -660,9 +671,9 @@ export default function AddFlightScreen() {
 
       <Modal visible={capacityOpen} transparent animationType="slide" onRequestClose={() => setCapacityOpen(false)}>
         <View className="flex-1 justify-end bg-black/60">
-          <View className="max-h-[70%] rounded-t-2xl bg-slate-900 px-4 pb-6 pt-4">
+          <View className="max-h-[70%] rounded-t-2xl bg-white px-4 pb-6 pt-4 dark:bg-slate-900">
             <View className="mb-2 flex-row items-center justify-between">
-              <Text className="text-lg font-bold text-white">Operating Capacity</Text>
+              <Text className="text-lg font-bold text-slate-900 dark:text-white">Operating Capacity</Text>
               <Pressable onPress={() => setCapacityOpen(false)}>
                 <Text className="text-sm font-semibold text-blue-400">Close</Text>
               </Pressable>
@@ -675,8 +686,8 @@ export default function AddFlightScreen() {
                     setOperatingCapacity(option.value);
                     setCapacityOpen(false);
                   }}
-                  className="flex-row items-center justify-between border-b border-slate-800 py-4">
-                  <Text className="text-base text-slate-100">{option.label}</Text>
+                  className="flex-row items-center justify-between border-b border-slate-200 py-4 dark:border-slate-800">
+                  <Text className="text-base text-slate-800 dark:text-slate-100">{option.label}</Text>
                   {option.value === operatingCapacity ? <FontAwesome name="check" size={14} color="#60a5fa" /> : null}
                 </Pressable>
               ))}

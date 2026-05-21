@@ -112,25 +112,25 @@ export function SearchablePresetField({
           placeholderTextColor="#64748b"
           autoCapitalize={autoCapitalize}
           autoCorrect={false}
-          className="flex-1 rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-base text-white"
+          className="flex-1 rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
         />
         <Pressable
           onPress={openModal}
           accessibilityLabel="Open saved options"
-          className="h-12 w-12 items-center justify-center rounded-xl border border-slate-700 bg-slate-800 active:bg-slate-700">
+          className="h-12 w-12 items-center justify-center rounded-xl border border-slate-300 bg-slate-100 active:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:active:bg-slate-700">
           <FontAwesome name="list" size={16} color="#94a3b8" />
         </Pressable>
       </View>
 
       {showInlineDropdown ? (
-        <View className="mt-1 max-h-40 overflow-hidden rounded-xl border border-slate-600 bg-slate-900">
+        <View className="mt-1 max-h-40 overflow-hidden rounded-xl border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-900">
           <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled>
             {inlineSuggestions.map((option) => (
               <Pressable
                 key={option}
                 onPress={() => selectOption(option)}
-                className="border-b border-slate-800 px-4 py-3 active:bg-slate-800">
-                <Text className="text-base text-slate-100">{option}</Text>
+                className="border-b border-slate-200 px-4 py-3 active:bg-slate-100 dark:border-slate-800 dark:active:bg-slate-800">
+                <Text className="text-base text-slate-800 dark:text-slate-100">{option}</Text>
               </Pressable>
             ))}
           </ScrollView>
@@ -139,9 +139,9 @@ export function SearchablePresetField({
 
       <Modal visible={modalOpen} transparent animationType="slide" onRequestClose={() => setModalOpen(false)}>
         <View className="flex-1 justify-end bg-black/60">
-          <View className="max-h-[75%] rounded-t-2xl bg-slate-900 px-4 pb-6 pt-4">
+          <View className="max-h-[75%] rounded-t-2xl bg-white px-4 pb-6 pt-4 dark:bg-slate-900">
             <View className="mb-3 flex-row items-center justify-between">
-              <Text className="text-lg font-bold text-white">Saved options</Text>
+              <Text className="text-lg font-bold text-slate-900 dark:text-white">Saved options</Text>
               <Pressable onPress={() => setModalOpen(false)}>
                 <Text className="text-sm font-semibold text-blue-400">Close</Text>
               </Pressable>
@@ -154,16 +154,16 @@ export function SearchablePresetField({
               placeholderTextColor="#64748b"
               autoCapitalize={autoCapitalize}
               autoCorrect={false}
-              className="mb-3 rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-base text-white"
+              className="mb-3 rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
             />
 
             {canAddInModal ? (
               <Pressable
                 onPress={() => addNewValue(addCandidate)}
                 disabled={adding}
-                className="mb-3 flex-row items-center justify-center gap-2 rounded-xl border border-blue-800 bg-blue-950/50 py-3 active:bg-blue-900/40 disabled:opacity-60">
+                className="mb-3 flex-row items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 py-3 active:bg-blue-100 disabled:opacity-60 dark:border-blue-800 dark:bg-blue-950/50 dark:active:bg-blue-900/40">
                 {adding ? <ActivityIndicator color="#60a5fa" size="small" /> : <FontAwesome name="plus" size={14} color="#60a5fa" />}
-                <Text className="text-sm font-semibold text-blue-300">Add new: {addCandidate}</Text>
+                <Text className="text-sm font-semibold text-blue-700 dark:text-blue-300">Add new: {addCandidate}</Text>
               </Pressable>
             ) : null}
 
@@ -179,8 +179,8 @@ export function SearchablePresetField({
                   <Pressable
                     key={option}
                     onPress={() => selectOption(option)}
-                    className="flex-row items-center justify-between border-b border-slate-800 py-4">
-                    <Text className="text-base text-slate-100">{option}</Text>
+                    className="flex-row items-center justify-between border-b border-slate-200 py-4 dark:border-slate-800">
+                    <Text className="text-base text-slate-800 dark:text-slate-100">{option}</Text>
                     {option.toLowerCase() === value.trim().toLowerCase() ? (
                       <FontAwesome name="check" size={14} color="#60a5fa" />
                     ) : null}

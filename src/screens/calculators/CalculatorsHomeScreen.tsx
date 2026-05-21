@@ -1,10 +1,11 @@
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import CalculatorSafeArea from './components/CalculatorSafeArea';
 import type { CalculatorStackParamList } from './types';
 import { CALCULATOR_ROUTE_HREFS } from './routes';
-import { colors } from './theme';
+import { AppFontFamily } from '@/constants/fonts';
+import { CalculatorColors, useCalculatorTheme } from './theme';
 
 interface CalculatorCard {
   name: string;
@@ -28,6 +29,8 @@ const calculators: CalculatorCard[] = [
 
 const CalculatorsHomeScreen: React.FC = () => {
   const router = useRouter();
+  const { colors } = useCalculatorTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   return (
     <CalculatorSafeArea>
@@ -56,54 +59,58 @@ const CalculatorsHomeScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  header: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 12,
-  },
-  heading: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  subheading: {
-    fontSize: 14,
-    color: colors.muted,
-    marginTop: 4,
-  },
-  list: {
-    paddingHorizontal: 12,
-    paddingBottom: 24,
-  },
-  row: {
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  card: {
-    width: '48%',
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    minHeight: 120,
-  },
-  icon: {
-    fontSize: 28,
-    marginBottom: 8,
-  },
-  name: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 4,
-  },
-  description: {
-    fontSize: 11,
-    color: colors.muted,
-    lineHeight: 16,
-  },
-});
+function createStyles(colors: CalculatorColors) {
+  return StyleSheet.create({
+    header: {
+      paddingHorizontal: 16,
+      paddingTop: 8,
+      paddingBottom: 12,
+    },
+    heading: {
+      fontSize: 24,
+      fontFamily: AppFontFamily.bold,
+      color: colors.text,
+    },
+    subheading: {
+      fontSize: 14,
+      fontFamily: AppFontFamily.regular,
+      color: colors.muted,
+      marginTop: 4,
+    },
+    list: {
+      paddingHorizontal: 12,
+      paddingBottom: 24,
+    },
+    row: {
+      justifyContent: 'space-between',
+      marginBottom: 12,
+    },
+    card: {
+      width: '48%',
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      minHeight: 120,
+    },
+    icon: {
+      fontSize: 28,
+      marginBottom: 8,
+    },
+    name: {
+      fontSize: 14,
+      fontFamily: AppFontFamily.bold,
+      color: colors.text,
+      marginBottom: 4,
+    },
+    description: {
+      fontSize: 11,
+      fontFamily: AppFontFamily.regular,
+      color: colors.muted,
+      lineHeight: 16,
+    },
+  });
+}
 
 export default CalculatorsHomeScreen;

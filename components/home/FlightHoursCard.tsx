@@ -1,10 +1,11 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { FlightMetric } from './types';
 
 type FlightHoursCardProps = {
   totalHours: string;
   metrics: FlightMetric[];
+  onPress?: () => void;
 };
 
 function MetricCell({ metric, showDivider }: { metric: FlightMetric; showDivider: boolean }) {
@@ -25,15 +26,18 @@ function MetricCell({ metric, showDivider }: { metric: FlightMetric; showDivider
   );
 }
 
-export function FlightHoursCard({ totalHours, metrics }: FlightHoursCardProps) {
+export function FlightHoursCard({ totalHours, metrics, onPress }: FlightHoursCardProps) {
   return (
-    <View className="mx-5 rounded-3xl bg-blue-700 px-5 py-5 shadow-lg shadow-blue-400/50">
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      className="mx-5 rounded-3xl bg-blue-700 px-5 py-5 shadow-lg shadow-blue-400/50 active:opacity-95">
       <View className="mb-2 flex-row items-center justify-between">
         <Text className="text-sm font-semibold uppercase tracking-wide text-blue-100">Total Flight Hours</Text>
         <FontAwesome name="plane" size={20} color="#93c5fd" />
       </View>
       <View className="mb-4 flex-row items-end">
-        <Text className="text-5xl font-extrabold text-white">{totalHours}</Text>
+        <Text className="text-5xl font-extrabold text-white font-familjen-bold">{totalHours}</Text>
         <Text className="mb-2 ml-2 text-base font-bold text-blue-100">HRS</Text>
       </View>
       <View className="h-px bg-blue-500" />
@@ -42,6 +46,6 @@ export function FlightHoursCard({ totalHours, metrics }: FlightHoursCardProps) {
           <MetricCell key={metric.key} metric={metric} showDivider={index > 0} />
         ))}
       </View>
-    </View>
+    </Pressable>
   );
 }

@@ -14,36 +14,12 @@ import { useSupabaseSession } from '@/utils/auth';
 import { flightDetailsHref } from '@/utils/flight-details-navigation';
 import { getProfile, ProfileRecord, RANK_OPTIONS, toLabel } from '@/utils/profile';
 import { aggregateFlightTotals, fetchCareerTotals, FlightTotalsRow } from '@/utils/career';
+import { FlightListRow, formatMinutesToHours, mapFlightRowToRecentFlight } from '@/utils/recent-flights';
 import { getRecencyStatus, isCplStudentPilot } from '@/utils/recency';
 import { supabase } from '@/utils/supabase';
 
-type FlightRow = {
-  id: string;
-  flight_date: string;
-  flight_number: string | null;
-  aircraft_type: string | null;
-  aircraft_registration: string | null;
-  origin_iata: string | null;
-  destination_iata: string | null;
-  pic_name: string | null;
-  co_pilot_name: string | null;
-  takeoffs: number | null;
-  landings: number | null;
-  go_arounds: number | null;
-  block_time_minutes: number | null;
-  pic_time_minutes: number | null;
-  sic_time_minutes: number | null;
-  night_time_minutes: number | null;
-};
-
 function RecentFlightCardSkeleton() {
   return <View className="mx-5 mb-3 h-40 rounded-2xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-900" />;
-}
-
-function formatMinutesToHours(minutes: number) {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return `${h}:${String(m).padStart(2, '0')}`;
 }
 
 export default function HomeScreen() {
@@ -110,30 +86,14 @@ export default function HomeScreen() {
           return;
         }
 
-        const rows = flightsData as FlightRow[];
+        const rows = flightsData as FlightListRow[];
         setLastFlightDate(rows[0]?.flight_date ?? null);
 
-        setRecentFlights(
-          rows.slice(0, 8).map((flight) => {
-            const date = new Date(flight.flight_date);
-            return {
-              id: flight.id,
-              day: String(date.getDate()).padStart(2, '0'),
-              month: date.toLocaleString('en-US', { month: 'short' }).toUpperCase(),
-              year: String(date.getFullYear()),
-              aircraft: flight.aircraft_type || '-',
-              aircraftTag: flight.aircraft_registration || '-',
-              routeFrom: flight.origin_iata || '-',
-              routeTo: flight.destination_iata || '-',
-              pilotName: flight.pic_name || profileData?.full_name || 'Pilot',
-              coPilotName: flight.co_pilot_name || '-',
-              duration: formatMinutesToHours(flight.block_time_minutes || 0),
-              landings: flight.landings ?? 0,
-              takeoffs: flight.takeoffs ?? 0,
-              goArounds: flight.go_arounds ?? 0,
-            };
-          })
-        );
+        const defaultPilotName =
+          profileData?.full_name ||
+          (session?.user?.user_metadata?.full_name as string | undefined) ||
+          'Pilot';
+        setRecentFlights(rows.slice(0, 8).map((flight) => mapFlightRowToRecentFlight(flight, defaultPilotName)));
       } finally {
         setLoadingHomeData(false);
       }
@@ -170,13 +130,17 @@ export default function HomeScreen() {
           {loadingHomeData ? (
             <View className="mx-5 h-52 rounded-3xl bg-slate-200 dark:bg-slate-800" />
           ) : (
-            <FlightHoursCard totalHours={totalHours} metrics={summaryMetrics} />
+            <FlightHoursCard
+              totalHours={totalHours}
+              metrics={summaryMetrics}
+              onPress={() => router.push('/career')}
+            />
           )}
 
           <SectionHeader
             title="Recent Flights"
             actionLabel="View All"
-            onActionPress={() => router.push('/career')}
+            onActionPress={() => router.push('/my-flights')}
           />
           {loadingHomeData
             ? [1, 2, 3].map((id) => <RecentFlightCardSkeleton key={id} />)

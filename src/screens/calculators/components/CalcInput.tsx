@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
-import { colors } from '../theme';
+import { type CalculatorColors, useCalculatorTheme } from '../theme';
 
 export interface CalcInputProps {
   label: string;
@@ -21,6 +21,9 @@ const CalcInput: React.FC<CalcInputProps> = ({
   error,
   keyboardType = 'numeric',
 }) => {
+  const { colors } = useCalculatorTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View style={styles.wrap}>
       <Text style={styles.label}>{label}</Text>
@@ -40,46 +43,48 @@ const CalcInput: React.FC<CalcInputProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  wrap: {
-    marginBottom: 14,
-  },
-  label: {
-    color: colors.muted,
-    fontSize: 13,
-    marginBottom: 6,
-    fontWeight: '500',
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  input: {
-    flex: 1,
-    backgroundColor: colors.bg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: colors.text,
-    fontSize: 16,
-  },
-  inputError: {
-    borderColor: colors.error,
-  },
-  unit: {
-    marginLeft: 10,
-    color: colors.accent,
-    fontSize: 14,
-    fontWeight: '600',
-    minWidth: 36,
-  },
-  error: {
-    color: colors.error,
-    fontSize: 12,
-    marginTop: 4,
-  },
-});
+function createStyles(colors: CalculatorColors) {
+  return StyleSheet.create({
+    wrap: {
+      marginBottom: 14,
+    },
+    label: {
+      color: colors.muted,
+      fontSize: 13,
+      marginBottom: 6,
+      fontWeight: '500',
+    },
+    inputRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    input: {
+      flex: 1,
+      backgroundColor: colors.bg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      color: colors.text,
+      fontSize: 16,
+    },
+    inputError: {
+      borderColor: colors.error,
+    },
+    unit: {
+      marginLeft: 10,
+      color: colors.accent,
+      fontSize: 14,
+      fontWeight: '600',
+      minWidth: 36,
+    },
+    error: {
+      color: colors.error,
+      fontSize: 12,
+      marginTop: 4,
+    },
+  });
+}
 
 export default CalcInput;

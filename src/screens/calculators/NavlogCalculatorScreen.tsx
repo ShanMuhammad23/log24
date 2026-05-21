@@ -7,8 +7,8 @@ import CalcInput from './components/CalcInput';
 import CalcResult from './components/CalcResult';
 import type { NavlogLeg, NavlogLegResult } from './types';
 import { fmt, parseNum, toRad, toDeg } from './utils';
-import { colors, sharedStyles } from './theme';
 import { StyleSheet } from 'react-native';
+import { useCalculatorTheme } from './theme';
 
 function newLeg(index: number): NavlogLeg {
   return {
@@ -53,6 +53,7 @@ function calculateLeg(leg: NavlogLeg): NavlogLegResult | null {
 
 const NavlogCalculatorScreen: React.FC = () => {
   const router = useRouter();
+  const { styles: sharedStyles, colors } = useCalculatorTheme();
   const [legs, setLegs] = useState<NavlogLeg[]>([newLeg(1), newLeg(2)]);
   const [showResults, setShowResults] = useState<boolean>(false);
 
@@ -74,6 +75,36 @@ const NavlogCalculatorScreen: React.FC = () => {
   const updateLeg = (id: string, field: keyof NavlogLeg, value: string): void => {
     setLegs((prev) => prev.map((leg) => (leg.id === id ? { ...leg, [field]: value } : leg)));
   };
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        legHeader: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        },
+        remove: {
+          color: colors.error,
+          fontSize: 13,
+          fontWeight: '600',
+        },
+        results: {
+          marginTop: 8,
+        },
+        addLeg: {
+          alignItems: 'center',
+          paddingVertical: 12,
+          marginBottom: 8,
+        },
+        addLegText: {
+          color: colors.accent,
+          fontSize: 15,
+          fontWeight: '600',
+        },
+      }),
+    [colors]
+  );
 
   return (
     <CalculatorSafeArea>
@@ -139,31 +170,5 @@ const NavlogCalculatorScreen: React.FC = () => {
     </CalculatorSafeArea>
   );
 };
-
-const styles = StyleSheet.create({
-  legHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  remove: {
-    color: colors.error,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  results: {
-    marginTop: 8,
-  },
-  addLeg: {
-    alignItems: 'center',
-    paddingVertical: 12,
-    marginBottom: 8,
-  },
-  addLegText: {
-    color: colors.accent,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-});
 
 export default NavlogCalculatorScreen;

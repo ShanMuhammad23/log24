@@ -7,7 +7,7 @@ import CalcInput from './components/CalcInput';
 import CalcResult from './components/CalcResult';
 import type { EntryType, HoldSide } from './types';
 import { parseNum } from './utils';
-import { sharedStyles } from './theme';
+import { useCalculatorTheme } from './theme';
 
 function determineEntry(angle: number, holdSide: HoldSide): EntryType {
   if (holdSide === 'Right') {
@@ -28,6 +28,7 @@ const ENTRY_DESCRIPTIONS: Record<EntryType, string> = {
 
 const HoldingPatternScreen: React.FC = () => {
   const router = useRouter();
+  const { styles: sharedStyles } = useCalculatorTheme();
   const [inboundCourse, setInboundCourse] = useState<string>('');
   const [aircraftHeading, setAircraftHeading] = useState<string>('');
   const [holdSide, setHoldSide] = useState<HoldSide>('Right');

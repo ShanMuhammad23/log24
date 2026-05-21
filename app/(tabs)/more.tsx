@@ -23,13 +23,13 @@ export default function MoreScreen() {
     preference === 'dark' ? 'moon-o' : preference === 'light' ? 'sun-o' : ('adjust' as const);
 
   return (
-    <SafeAreaView edges={['top']} className="flex-1 bg-slate-950">
+    <SafeAreaView edges={['top']} className="flex-1 bg-slate-50 dark:bg-slate-950">
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 24 }}>
-        <Text className="mb-5 px-1 text-2xl font-bold text-white">Menu</Text>
+        <Text className="mb-5 px-1 text-2xl font-bold text-slate-900 dark:text-white">Menu</Text>
 
-        <View className="overflow-hidden rounded-2xl bg-slate-900">
+        <View className="overflow-hidden rounded-2xl bg-white dark:bg-slate-900">
           {SETTINGS_ITEMS.map((item, index) => (
             <Pressable
               key={item.label}
@@ -38,17 +38,17 @@ export default function MoreScreen() {
                   router.push(item.route as '/profile' | '/my-account' | '/import-flights');
                 }
               }}
-              className="active:bg-slate-800"
+              className="active:bg-slate-100 dark:active:bg-slate-800"
               android_ripple={{ color: 'rgba(148,163,184,0.2)' }}>
               <View
                 className={`flex-row items-center justify-between px-5 py-4 ${
-                  index !== SETTINGS_ITEMS.length - 1 ? 'border-b border-slate-800' : ''
+                  index !== SETTINGS_ITEMS.length - 1 ? 'border-b border-slate-200 dark:border-slate-800' : ''
                 }`}>
                 <View className="flex-row items-center">
-                  <View className="mr-3 h-8 w-8 items-center justify-center rounded-lg bg-slate-800">
-                    <FontAwesome name={item.icon} size={14} color="#bfdbfe" />
+                  <View className="mr-3 h-8 w-8 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800">
+                    <FontAwesome name={item.icon} size={14} color="#2563eb" />
                   </View>
-                  <Text className="text-base font-medium text-slate-100">{item.label}</Text>
+                  <Text className="text-base font-medium text-slate-800 dark:text-slate-100">{item.label}</Text>
                 </View>
                 <FontAwesome name="chevron-right" size={13} color="#94a3b8" />
               </View>
@@ -58,19 +58,19 @@ export default function MoreScreen() {
 
         <Pressable
           onPress={() => cyclePreference()}
-          className="mt-5 overflow-hidden rounded-2xl bg-slate-900 active:bg-slate-800"
+          className="mt-5 overflow-hidden rounded-2xl bg-white active:bg-slate-100 dark:bg-slate-900 dark:active:bg-slate-800"
           android_ripple={{ color: 'rgba(148,163,184,0.2)' }}>
           <View className="flex-row items-center justify-between px-5 py-4">
             <View className="flex-row items-center">
-              <View className="mr-3 h-8 w-8 items-center justify-center rounded-lg bg-slate-800">
-                <FontAwesome name={themeIcon} size={14} color="#bfdbfe" />
+              <View className="mr-3 h-8 w-8 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800">
+                <FontAwesome name={themeIcon} size={14} color="#2563eb" />
               </View>
               <View>
-                <Text className="text-base font-medium text-slate-100">App Theme</Text>
-                <Text className="text-sm text-slate-400">{themePreferenceLabel(preference)}</Text>
+                <Text className="text-base font-medium text-slate-800 dark:text-slate-100">App Theme</Text>
+                <Text className="text-sm text-slate-500 dark:text-slate-400">{themePreferenceLabel(preference)}</Text>
               </View>
             </View>
-            <Text className="text-sm font-semibold text-blue-400">Change</Text>
+            <Text className="text-sm font-semibold text-blue-600 dark:text-blue-400">Change</Text>
           </View>
         </Pressable>
 
@@ -83,7 +83,9 @@ export default function MoreScreen() {
           android_ripple={{ color: 'rgba(244,63,94,0.18)' }}>
           <Text className="text-base font-semibold text-white">Logout</Text>
         </Pressable>
-        <Text className="mt-7 text-center text-sm text-slate-400">Made with ❤ by Shan Muhammad from <Link href="https://pilotshala.com" target="_blank">Pilotshala</Link></Text>
+        <Text className="mt-7 text-center text-sm text-slate-500 dark:text-slate-400">
+          Made with ❤ by Shan Muhammad from <Link href="https://pilotshala.com" target="_blank">Pilotshala</Link>
+        </Text>
       </ScrollView>
     </SafeAreaView>
   );

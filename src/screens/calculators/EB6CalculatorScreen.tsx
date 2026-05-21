@@ -1,16 +1,17 @@
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import CalcButton from './components/CalcButton';
 import CalculatorSafeArea from './components/CalculatorSafeArea';
 import CalcInput from './components/CalcInput';
 import CalcResult from './components/CalcResult';
 import type { EB6Mode, TsdSolve } from './types';
 import { fmt, parseNum, toDeg, toRad } from './utils';
-import { colors, sharedStyles } from './theme';
+import { useCalculatorTheme } from './theme';
 
 const EB6CalculatorScreen: React.FC = () => {
   const router = useRouter();
+  const { styles: sharedStyles, colors } = useCalculatorTheme();
   const [mode, setMode] = useState<EB6Mode>('TSD');
   const [solve, setSolve] = useState<TsdSolve>('time');
   const [speed, setSpeed] = useState<string>('');
@@ -68,6 +69,8 @@ const EB6CalculatorScreen: React.FC = () => {
   const handleCalculate = (): void => {
     setShowResults(true);
   };
+
+  const errorTextStyle = { color: colors.error, fontSize: 14, textAlign: 'center' as const };
 
   return (
     <CalculatorSafeArea>
@@ -164,19 +167,12 @@ const EB6CalculatorScreen: React.FC = () => {
         ) : null}
 
         {showResults && mode === 'Wind' && !windResult ? (
-          <Text style={styles.errorText}>Check inputs (TAS must exceed crosswind component).</Text>
+          <Text style={errorTextStyle}>Check inputs (TAS must exceed crosswind component).</Text>
         ) : null}
       </ScrollView>
     </CalculatorSafeArea>
   );
 };
 
-const styles = StyleSheet.create({
-  errorText: {
-    color: colors.error,
-    fontSize: 14,
-    textAlign: 'center',
-  },
-});
 
 export default EB6CalculatorScreen;

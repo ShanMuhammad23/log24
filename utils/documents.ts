@@ -142,16 +142,35 @@ export async function updatePilotDocument(userId: string, documentId: string, pa
   return supabase.from('pilot_documents').update(payload).eq('user_id', userId).eq('id', documentId);
 }
 
+export function documentErrorMessage(error: unknown): string {
+  if (error && typeof error === 'object' && 'message' in error && typeof (error as { message: string }).message === 'string') {
+    return (error as { message: string }).message;
+  }
+  return 'Something went wrong. Please try again.';
+}
+
 export async function deletePilotDocument(userId: string, documentId: string) {
   const { data: doc, error: fetchError } = await fetchPilotDocumentById(userId, documentId);
   if (fetchError) return { error: fetchError };
-  if (!doc) return { error: new Error('Document not found') };
+  if (!doc) return { error: { message: 'Document not found.' } };
 
-  const { error: deleteError } = await supabase.from('pilot_documents').delete().eq('user_id', userId).eq('id', documentId);
+  const { data: deleted, error: deleteError } = await supabase
+    .from('pilot_documents')
+    .delete()
+    .eq('user_id', userId)
+    .eq('id', documentId)
+    .select('id');
+
   if (deleteError) return { error: deleteError };
+  if (!deleted?.length) {
+    return { error: { message: 'Document not found or you do not have permission to delete it.' } };
+  }
 
   if (doc.file_path) {
-    await supabase.storage.from('pilot-documents').remove([doc.file_path]);
+    const { error: storageError } = await supabase.storage.from('pilot-documents').remove([doc.file_path]);
+    if (storageError) {
+      console.warn('Document deleted but file removal failed:', storageError.message);
+    }
   }
 
   return { error: null };
