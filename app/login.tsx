@@ -1,11 +1,12 @@
 import { useSupabaseSession } from '@/utils/auth';
+import { isNativeGoogleSignInAvailable, signInWithGoogleNative } from '@/utils/google-auth';
 import { supabase } from '@/utils/supabase';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import * as Linking from 'expo-linking';
 import { Link, Redirect } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, Text, TextInput, View } from 'react-native';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -66,13 +67,31 @@ export default function LoginScreen() {
     setLoadingAction(null);
   };
 
-  const signInWithOAuth = async (provider: 'google' | 'apple') => {
+  const signInWithGoogle = async () => {
     setErrorMessage(null);
-    setLoadingAction(provider);
+    setLoadingAction('google');
+
+    try {
+      const { error } = await signInWithGoogleNative();
+      if (error) {
+        setErrorMessage(error);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Google Sign-In failed.';
+      setErrorMessage(message);
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  /** Apple still uses the browser OAuth flow (native Apple uses expo-apple-authentication separately). */
+  const signInWithAppleOAuth = async () => {
+    setErrorMessage(null);
+    setLoadingAction('apple');
     const redirectTo = Linking.createURL('auth/callback');
 
     const { data, error } = await supabase.auth.signInWithOAuth({
-      provider,
+      provider: 'apple',
       options: {
         redirectTo,
         skipBrowserRedirect: true,
@@ -81,7 +100,7 @@ export default function LoginScreen() {
 
     if (error || !data?.url) {
       setLoadingAction(null);
-      setErrorMessage(error?.message || `Could not start ${provider} login.`);
+      setErrorMessage(error?.message || 'Could not start Apple login.');
       return;
     }
 
@@ -89,7 +108,7 @@ export default function LoginScreen() {
     if (result.type !== 'success' || !result.url) {
       setLoadingAction(null);
       if (result.type !== 'cancel') {
-        setErrorMessage(`${provider === 'google' ? 'Google' : 'Apple'} sign in was not completed.`);
+        setErrorMessage('Apple sign in was not completed.');
       }
       return;
     }
@@ -98,14 +117,14 @@ export default function LoginScreen() {
     const code = url.searchParams.get('code');
     if (!code) {
       setLoadingAction(null);
-      setErrorMessage('Missing auth code from OAuth redirect.');
+      setErrorMessage('Missing auth code from Apple redirect.');
       return;
     }
 
     const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
     setLoadingAction(null);
     if (exchangeError) {
-      setErrorMessage(exchangeError.message || 'Could not complete OAuth sign in.');
+      setErrorMessage(exchangeError.message || 'Could not complete Apple sign in.');
     }
   };
 
@@ -164,19 +183,30 @@ export default function LoginScreen() {
         <View className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
       </View>
 
-      <Pressable
-        onPress={() => signInWithOAuth('google')}
-        disabled={loadingAction !== null}
-        className="flex-row items-center justify-center rounded-2xl border border-zinc-300 bg-zinc-50 py-4 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900">
-        {loadingAction === 'google' ? <ActivityIndicator color="#2563eb" /> : <FontAwesome name="google" size={22} color="#2563eb" />}
-        <Text className="ml-2 text-base font-semibold text-zinc-900 dark:text-zinc-100">Continue with Google</Text>
-      </Pressable>
+      {Platform.OS !== 'web' ? (
+        <>
+          <Pressable
+            onPress={signInWithGoogle}
+            disabled={loadingAction !== null || !isNativeGoogleSignInAvailable()}
+            className="flex-row items-center justify-center rounded-2xl border border-zinc-300 bg-zinc-50 py-4 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900">
+            {loadingAction === 'google' ? <ActivityIndicator color="#2563eb" /> : <FontAwesome name="google" size={22} color="#2563eb" />}
+            <Text className="ml-2 text-base font-semibold text-zinc-900 dark:text-zinc-100">Continue with Google</Text>
+          </Pressable>
+          {!isNativeGoogleSignInAvailable() ? (
+            <Text className="mt-2 text-center text-xs text-amber-600 dark:text-amber-400">
+              Google Sign-In requires a dev build (expo run:android). Not available in Expo Go.
+            </Text>
+          ) : null}
+        </>
+      ) : (
+        <Text className="text-center text-sm text-zinc-500">Use the mobile app for Google Sign-In.</Text>
+      )}
 
       <Pressable
-        onPress={() => signInWithOAuth('apple')}
+        onPress={signInWithAppleOAuth}
         disabled={loadingAction !== null}
         className="mt-3 flex-row items-center justify-center rounded-2xl border border-zinc-300 bg-zinc-50 py-4 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900">
-        {loadingAction === 'apple' ? <ActivityIndicator color="#111827" /> : <FontAwesome name="apple" size={24} className='text-zinc-900 dark:text-zinc-100' color={'#ffffff'}/>}
+        {loadingAction === 'apple' ? <ActivityIndicator color="#111827" /> : <FontAwesome name="apple" size={24} color="#ffffff" />}
         <Text className="ml-2 text-base font-semibold text-zinc-900 dark:text-zinc-100">Continue with Apple</Text>
       </Pressable>
 

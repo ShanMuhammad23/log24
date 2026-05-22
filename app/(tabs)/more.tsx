@@ -3,6 +3,7 @@ import { Link, useRouter } from 'expo-router';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { themePreferenceLabel, useAppTheme } from '@/contexts/ThemeProvider';
+import { signOutGoogleNative } from '@/utils/google-auth';
 import { supabase } from '@/utils/supabase';
 
 const SETTINGS_ITEMS = [
@@ -76,6 +77,7 @@ export default function MoreScreen() {
 
         <Pressable
           onPress={async () => {
+            await signOutGoogleNative();
             await supabase.auth.signOut();
             router.replace('/login');
           }}
