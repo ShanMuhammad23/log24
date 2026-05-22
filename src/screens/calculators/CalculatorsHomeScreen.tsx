@@ -15,7 +15,7 @@ interface CalculatorCard {
 }
 
 const calculators: CalculatorCard[] = [
-  { name: 'E6B Calculator', route: 'EB6Calculator', icon: '✈️', description: 'TSD, Fuel & Wind' },
+  { name: 'Calculator', route: 'EB6Calculator', icon: '✈️', description: 'TSD, Fuel & Wind' },
   { name: 'Navlog', route: 'NavlogCalculator', icon: '🗺️', description: 'Cross-country planning' },
   { name: 'Holding Pattern', route: 'HoldingPattern', icon: '🔄', description: 'Entry sector & type' },
   { name: 'Weight & Balance', route: 'WeightBalance', icon: '⚖️', description: 'CG & limits' },

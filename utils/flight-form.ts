@@ -115,8 +115,39 @@ export function parseCount(value: string, fallback = 0) {
   return parsed;
 }
 
+/** Map block time to PIC / SIC columns from operating capacity (matches CSV import semantics). */
+export function deriveRoleTimeMinutes(
+  blockMinutes: number | null,
+  operatingCapacity: string
+): { pic_time_minutes: number | null; sic_time_minutes: number | null } {
+  if (blockMinutes === null || blockMinutes <= 0) {
+    return { pic_time_minutes: null, sic_time_minutes: null };
+  }
+
+  const capacity = operatingCapacity.trim().toLowerCase();
+
+  switch (capacity) {
+    case 'dual':
+      return { pic_time_minutes: null, sic_time_minutes: blockMinutes };
+    case 'pic':
+    case 'solo':
+    case 'p1u_s':
+    case 'examiner':
+    case 'instructor':
+      return { pic_time_minutes: blockMinutes, sic_time_minutes: null };
+    case 'copilot':
+    case 'observer':
+    case 'relief':
+      return { pic_time_minutes: null, sic_time_minutes: blockMinutes };
+    default:
+      return { pic_time_minutes: null, sic_time_minutes: null };
+  }
+}
+
 export function buildFlightSavePayload(input: FlightSaveInput): Record<string, unknown> {
   const blockMinutes = blockMinutesFromOutIn(input.outTime, input.inTime);
+  const capacity = input.operatingCapacity.trim().toLowerCase();
+  const roleTimes = deriveRoleTimeMinutes(blockMinutes, capacity);
   const nightMinutes = toMinutes(input.night);
   const instrumentTimingsMinutes = toMinutes(input.instrumentTimings);
   const ifrActualMinutes = toMinutes(input.ifrActual);
@@ -138,7 +169,9 @@ export function buildFlightSavePayload(input: FlightSaveInput): Record<string, u
     ifr_actual_minutes: ifrActualMinutes,
     ifr_simulated_minutes: ifrSimulatedMinutes,
     cross_country_total_minutes: crossCountryMinutes,
-    operating_capacity: input.operatingCapacity,
+    operating_capacity: capacity || null,
+    pic_time_minutes: roleTimes.pic_time_minutes,
+    sic_time_minutes: roleTimes.sic_time_minutes,
     pic_name: input.picName.trim() || null,
     co_pilot_name: input.coPilotName.trim() || null,
     out_time: normalizeTimeForDb(input.outTime),

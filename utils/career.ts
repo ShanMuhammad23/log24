@@ -71,8 +71,34 @@ function rowBlock(row: FlightTotalsRow) {
   return row.block_time_minutes || 0;
 }
 
+function normalizeCapacity(row: FlightTotalsRow) {
+  return (row.operating_capacity || '').toLowerCase();
+}
+
+/** PIC hours for home/career when legacy rows lack pic_time_minutes. */
+export function picMinutesForRow(row: FlightTotalsRow) {
+  const stored = row.pic_time_minutes || 0;
+  if (stored > 0) return stored;
+  const capacity = normalizeCapacity(row);
+  if (['pic', 'solo', 'p1u_s', 'examiner', 'instructor'].includes(capacity)) {
+    return row.block_time_minutes || 0;
+  }
+  return 0;
+}
+
+/** Dual / SIC hours for home when legacy rows lack sic_time_minutes. */
+export function dualMinutesForRow(row: FlightTotalsRow) {
+  const stored = row.sic_time_minutes || 0;
+  if (stored > 0) return stored;
+  const capacity = normalizeCapacity(row);
+  if (capacity === 'dual' || ['copilot', 'observer', 'relief'].includes(capacity)) {
+    return row.block_time_minutes || 0;
+  }
+  return 0;
+}
+
 function rowPic(row: FlightTotalsRow) {
-  return row.pic_time_minutes || 0;
+  return picMinutesForRow(row);
 }
 
 function rowNight(row: FlightTotalsRow) {
@@ -148,7 +174,7 @@ export function aggregateCareerHourSummary(rows: FlightTotalsRow[]): CareerHourS
     ifActual += ifrLogged;
 
     if (capacity === 'dual') {
-      dual += block;
+      dual += dualMinutesForRow(row);
       ifDual += Math.min(instrument, block);
     } else if (capacity === 'solo') {
       soloPic += pic > 0 ? pic : block;
@@ -221,14 +247,11 @@ function percentFromMinutes(current: number, target: number) {
 
 export function aggregateFlightTotals(rows: FlightTotalsRow[]) {
   const total = rows.reduce((acc, row) => acc + (row.block_time_minutes || 0), 0);
-  const pic = rows.reduce((acc, row) => acc + (row.pic_time_minutes || 0), 0);
+  const pic = rows.reduce((acc, row) => acc + picMinutesForRow(row), 0);
   const copilot = rows.reduce((acc, row) => acc + (row.sic_time_minutes || 0), 0);
-  const dual = rows.reduce((acc, row) => {
-    if (row.operating_capacity === 'dual') return acc + (row.block_time_minutes || 0);
-    return acc;
-  }, 0);
+  const dual = rows.reduce((acc, row) => acc + dualMinutesForRow(row), 0);
   const instruction = rows.reduce((acc, row) => {
-    if (row.operating_capacity === 'instructor') return acc + (row.block_time_minutes || 0);
+    if (normalizeCapacity(row) === 'instructor') return acc + (row.block_time_minutes || 0);
     return acc;
   }, 0);
   const crossCountry = rows.reduce((acc, row) => {

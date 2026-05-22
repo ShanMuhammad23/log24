@@ -139,7 +139,7 @@ export default function CareerScreen() {
     <SafeAreaView edges={['top']} className="flex-1 bg-slate-50 dark:bg-slate-950">
       <View className="flex-1">
         <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 120 }}>
-          <Text className="mb-3 text-center text-3xl font-bold text-slate-900 dark:text-slate-100">Career</Text>
+          <Text className="mb-3 text-center text-3xl font-bold text-slate-900 dark:text-slate-100">Report</Text>
 
           {loading ? (
             <View className="mt-6 items-center">

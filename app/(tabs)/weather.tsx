@@ -62,7 +62,7 @@ export default function WeatherScreen() {
           <TextInput
             value={stationId}
             onChangeText={(text) => setStationId(text.toUpperCase())}
-            placeholder="KMCI"
+            placeholder="Enter ICAO Code"
             placeholderTextColor="#64748b"
             autoCapitalize="characters"
             autoCorrect={false}
