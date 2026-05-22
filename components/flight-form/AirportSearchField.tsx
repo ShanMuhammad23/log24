@@ -1,14 +1,7 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Modal,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { BottomSheetModal } from '@/components/BottomSheetModal';
 import {
   AIRPORT_SEARCH_MIN_CHARS,
   airportLabel,
@@ -258,50 +251,49 @@ export function AirportSearchField({
         </View>
       ) : null}
 
-      <Modal visible={modalOpen} transparent animationType="slide" onRequestClose={() => setModalOpen(false)}>
-        <View className="flex-1 justify-end bg-black/60">
-          <View className="max-h-[80%] rounded-t-2xl bg-white px-4 pb-6 pt-4 dark:bg-slate-900">
-            <View className="mb-3 flex-row items-center justify-between">
-              <Text className="text-lg font-bold text-slate-900 dark:text-white">Airports</Text>
-              <Pressable onPress={() => setModalOpen(false)}>
-                <Text className="text-sm font-semibold text-blue-400">Close</Text>
-              </Pressable>
-            </View>
-
-            <TextInput
-              value={modalQuery}
-              onChangeText={(text) => setModalQuery(text.toUpperCase())}
-              placeholder="Search ICAO, IATA, name, city..."
-              placeholderTextColor="#64748b"
-              autoCapitalize="characters"
-              autoCorrect={false}
-              className="mb-3 rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-            />
-
-            {canSaveCustom ? (
-              <Pressable
-                onPress={saveTypedCode}
-                disabled={adding}
-                className="mb-3 flex-row items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 py-3 active:bg-blue-100 disabled:opacity-60 dark:border-blue-800 dark:bg-blue-950/50 dark:active:bg-blue-900/40">
-                {adding ? <ActivityIndicator color="#60a5fa" size="small" /> : <FontAwesome name="plus" size={14} color="#60a5fa" />}
-                <Text className="text-sm font-semibold text-blue-700 dark:text-blue-300">Save to my airports: {typedCode}</Text>
-              </Pressable>
-            ) : null}
-
-            {addError ? <Text className="mb-2 text-sm text-red-400">{addError}</Text> : null}
-
-            <ScrollView keyboardShouldPersistTaps="handled">
-              {renderResults(
-                savedResults,
-                globalResults,
-                modalQuery.trim().length < AIRPORT_SEARCH_MIN_CHARS
-                  ? 'Your saved airports appear here. Type 2+ characters to search the full database.'
-                  : 'No matches. Use Save to add a custom code.'
-              )}
-            </ScrollView>
-          </View>
+      <BottomSheetModal
+        visible={modalOpen}
+        onClose={() => setModalOpen(false)}
+        sheetClassName="max-h-[80%] rounded-t-2xl bg-white px-4 pb-6 pt-4 dark:bg-slate-900">
+        <View className="mb-3 flex-row items-center justify-between">
+          <Text className="text-lg font-bold text-slate-900 dark:text-white">Airports</Text>
+          <Pressable onPress={() => setModalOpen(false)}>
+            <Text className="text-sm font-semibold text-blue-400">Close</Text>
+          </Pressable>
         </View>
-      </Modal>
+
+        <TextInput
+          value={modalQuery}
+          onChangeText={(text) => setModalQuery(text.toUpperCase())}
+          placeholder="Search ICAO, IATA, name, city..."
+          placeholderTextColor="#64748b"
+          autoCapitalize="characters"
+          autoCorrect={false}
+          className="mb-3 rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+        />
+
+        {canSaveCustom ? (
+          <Pressable
+            onPress={saveTypedCode}
+            disabled={adding}
+            className="mb-3 flex-row items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 py-3 active:bg-blue-100 disabled:opacity-60 dark:border-blue-800 dark:bg-blue-950/50 dark:active:bg-blue-900/40">
+            {adding ? <ActivityIndicator color="#60a5fa" size="small" /> : <FontAwesome name="plus" size={14} color="#60a5fa" />}
+            <Text className="text-sm font-semibold text-blue-700 dark:text-blue-300">Save to my airports: {typedCode}</Text>
+          </Pressable>
+        ) : null}
+
+        {addError ? <Text className="mb-2 text-sm text-red-400">{addError}</Text> : null}
+
+        <ScrollView keyboardShouldPersistTaps="handled">
+          {renderResults(
+            savedResults,
+            globalResults,
+            modalQuery.trim().length < AIRPORT_SEARCH_MIN_CHARS
+              ? 'Your saved airports appear here. Type 2+ characters to search the full database.'
+              : 'No matches. Use Save to add a custom code.'
+          )}
+        </ScrollView>
+      </BottomSheetModal>
     </View>
   );
 }

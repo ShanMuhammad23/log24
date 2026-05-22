@@ -1,15 +1,8 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Modal,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import { filterPresetOptions } from '@/utils/flight-field-presets';
+import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { BottomSheetModal } from '@/components/BottomSheetModal';
+import { dedupePresetOptions, filterPresetOptions } from '@/utils/flight-field-presets';
 
 type SearchablePresetFieldProps = {
   value: string;
@@ -35,8 +28,15 @@ export function SearchablePresetField({
   const [addError, setAddError] = useState<string | null>(null);
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const inlineSuggestions = useMemo(() => filterPresetOptions(options, value), [options, value]);
-  const modalSuggestions = useMemo(() => filterPresetOptions(options, modalQuery), [options, modalQuery]);
+  const uniqueOptions = useMemo(() => dedupePresetOptions(options), [options]);
+  const inlineSuggestions = useMemo(
+    () => filterPresetOptions(uniqueOptions, value),
+    [uniqueOptions, value]
+  );
+  const modalSuggestions = useMemo(
+    () => filterPresetOptions(uniqueOptions, modalQuery),
+    [uniqueOptions, modalQuery]
+  );
 
   const showInlineDropdown = focused && inlineSuggestions.length > 0;
 
@@ -98,7 +98,7 @@ export function SearchablePresetField({
   const addCandidate = (modalQuery || value).trim();
   const canAddInModal =
     addCandidate.length > 0 &&
-    !options.some((o) => o.toLowerCase() === addCandidate.toLowerCase());
+    !uniqueOptions.some((o) => o.toLowerCase() === addCandidate.toLowerCase());
 
   return (
     <View>
@@ -125,9 +125,9 @@ export function SearchablePresetField({
       {showInlineDropdown ? (
         <View className="mt-1 max-h-40 overflow-hidden rounded-xl border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-900">
           <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled>
-            {inlineSuggestions.map((option) => (
+            {inlineSuggestions.map((option, index) => (
               <Pressable
-                key={option}
+                key={`${option}-${index}`}
                 onPress={() => selectOption(option)}
                 className="border-b border-slate-200 px-4 py-3 active:bg-slate-100 dark:border-slate-800 dark:active:bg-slate-800">
                 <Text className="text-base text-slate-800 dark:text-slate-100">{option}</Text>
@@ -137,60 +137,56 @@ export function SearchablePresetField({
         </View>
       ) : null}
 
-      <Modal visible={modalOpen} transparent animationType="slide" onRequestClose={() => setModalOpen(false)}>
-        <View className="flex-1 justify-end bg-black/60">
-          <View className="max-h-[75%] rounded-t-2xl bg-white px-4 pb-6 pt-4 dark:bg-slate-900">
-            <View className="mb-3 flex-row items-center justify-between">
-              <Text className="text-lg font-bold text-slate-900 dark:text-white">Saved options</Text>
-              <Pressable onPress={() => setModalOpen(false)}>
-                <Text className="text-sm font-semibold text-blue-400">Close</Text>
-              </Pressable>
-            </View>
-
-            <TextInput
-              value={modalQuery}
-              onChangeText={setModalQuery}
-              placeholder="Search..."
-              placeholderTextColor="#64748b"
-              autoCapitalize={autoCapitalize}
-              autoCorrect={false}
-              className="mb-3 rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-            />
-
-            {canAddInModal ? (
-              <Pressable
-                onPress={() => addNewValue(addCandidate)}
-                disabled={adding}
-                className="mb-3 flex-row items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 py-3 active:bg-blue-100 disabled:opacity-60 dark:border-blue-800 dark:bg-blue-950/50 dark:active:bg-blue-900/40">
-                {adding ? <ActivityIndicator color="#60a5fa" size="small" /> : <FontAwesome name="plus" size={14} color="#60a5fa" />}
-                <Text className="text-sm font-semibold text-blue-700 dark:text-blue-300">Add new: {addCandidate}</Text>
-              </Pressable>
-            ) : null}
-
-            {addError ? <Text className="mb-2 text-sm text-red-400">{addError}</Text> : null}
-
-            <ScrollView keyboardShouldPersistTaps="handled">
-              {modalSuggestions.length === 0 ? (
-                <Text className="py-6 text-center text-sm text-slate-500">
-                  {options.length === 0 ? 'No saved values yet. Use Add new above.' : 'No matches. Use Add new to save this value.'}
-                </Text>
-              ) : (
-                modalSuggestions.map((option) => (
-                  <Pressable
-                    key={option}
-                    onPress={() => selectOption(option)}
-                    className="flex-row items-center justify-between border-b border-slate-200 py-4 dark:border-slate-800">
-                    <Text className="text-base text-slate-800 dark:text-slate-100">{option}</Text>
-                    {option.toLowerCase() === value.trim().toLowerCase() ? (
-                      <FontAwesome name="check" size={14} color="#60a5fa" />
-                    ) : null}
-                  </Pressable>
-                ))
-              )}
-            </ScrollView>
-          </View>
+      <BottomSheetModal visible={modalOpen} onClose={() => setModalOpen(false)}>
+        <View className="mb-3 flex-row items-center justify-between">
+          <Text className="text-lg font-bold text-slate-900 dark:text-white">Saved options</Text>
+          <Pressable onPress={() => setModalOpen(false)}>
+            <Text className="text-sm font-semibold text-blue-400">Close</Text>
+          </Pressable>
         </View>
-      </Modal>
+
+        <TextInput
+          value={modalQuery}
+          onChangeText={setModalQuery}
+          placeholder="Search..."
+          placeholderTextColor="#64748b"
+          autoCapitalize={autoCapitalize}
+          autoCorrect={false}
+          className="mb-3 rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+        />
+
+        {canAddInModal ? (
+          <Pressable
+            onPress={() => addNewValue(addCandidate)}
+            disabled={adding}
+            className="mb-3 flex-row items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 py-3 active:bg-blue-100 disabled:opacity-60 dark:border-blue-800 dark:bg-blue-950/50 dark:active:bg-blue-900/40">
+            {adding ? <ActivityIndicator color="#60a5fa" size="small" /> : <FontAwesome name="plus" size={14} color="#60a5fa" />}
+            <Text className="text-sm font-semibold text-blue-700 dark:text-blue-300">Add new: {addCandidate}</Text>
+          </Pressable>
+        ) : null}
+
+        {addError ? <Text className="mb-2 text-sm text-red-400">{addError}</Text> : null}
+
+        <ScrollView keyboardShouldPersistTaps="handled">
+          {modalSuggestions.length === 0 ? (
+            <Text className="py-6 text-center text-sm text-slate-500">
+              {uniqueOptions.length === 0 ? 'No saved values yet. Use Add new above.' : 'No matches. Use Add new to save this value.'}
+            </Text>
+          ) : (
+            modalSuggestions.map((option, index) => (
+              <Pressable
+                key={`${option}-${index}`}
+                onPress={() => selectOption(option)}
+                className="flex-row items-center justify-between border-b border-slate-200 py-4 dark:border-slate-800">
+                <Text className="text-base text-slate-800 dark:text-slate-100">{option}</Text>
+                {option.toLowerCase() === value.trim().toLowerCase() ? (
+                  <FontAwesome name="check" size={14} color="#60a5fa" />
+                ) : null}
+              </Pressable>
+            ))
+          )}
+        </ScrollView>
+      </BottomSheetModal>
     </View>
   );
 }

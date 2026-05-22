@@ -1,9 +1,8 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Modal,
   Pressable,
   ScrollView,
   Switch,
@@ -20,9 +19,13 @@ import {
   formatDateISO,
   formatDuration,
   formatTimeFromDb,
+  isCompleteTimeEntry,
   minutesToHHMM,
+  nightExceedsBlockTime,
+  toMinutes,
   type FlightSaveInput,
 } from '@/utils/flight-form';
+import { BottomSheetModal } from '@/components/BottomSheetModal';
 import { AirportSearchField } from '@/components/flight-form/AirportSearchField';
 import { SearchablePresetField } from '@/components/flight-form/SearchablePresetField';
 import {
@@ -90,7 +93,7 @@ function FieldRow({
     <View className="mb-3 flex-row items-center gap-3">
       <Text className="w-36 text-sm font-semibold text-slate-600 dark:text-slate-300">
         {label}
-        {required ? ' *' : ''}
+        {required ? <Text className="text-base font-bold text-red-600 dark:text-red-500"> *</Text> : null}
       </Text>
       <View className="flex-1">{children}</View>
     </View>
@@ -152,9 +155,9 @@ export default function AddFlightScreen() {
   const [capacityOpen, setCapacityOpen] = useState(false);
   const [outTime, setOutTime] = useState('');
   const [inTime, setInTime] = useState('');
-  const [takeoffs, setTakeoffs] = useState('1');
-  const [landings, setLandings] = useState('1');
-  const [goArounds, setGoArounds] = useState('0');
+  const [takeoffs, setTakeoffs] = useState('');
+  const [landings, setLandings] = useState('');
+  const [goArounds, setGoArounds] = useState('');
   const [isCrossCountry, setIsCrossCountry] = useState(false);
   const [pfTakeoffLanding, setPfTakeoffLanding] = useState(false);
   const [stl, setStl] = useState(false);
@@ -165,12 +168,33 @@ export default function AddFlightScreen() {
   const [success, setSuccess] = useState<string | null>(null);
   const [fieldPresets, setFieldPresets] = useState<FlightFieldPresetsMap>(() => emptyFlightFieldPresets());
   const [savedAirports, setSavedAirports] = useState<AirportOption[]>([]);
+  const inTimeRef = useRef<TextInput>(null);
+  const outTimeWasCompleteRef = useRef(false);
+
+  const blockMinutes = useMemo(() => blockMinutesFromOutIn(outTime, inTime), [outTime, inTime]);
 
   const totalTime = useMemo(() => {
-    const minutes = blockMinutesFromOutIn(outTime, inTime);
-    if (minutes === null) return '--:--';
-    return formatDuration(minutes);
-  }, [outTime, inTime]);
+    if (blockMinutes === null) return '--:--';
+    return formatDuration(blockMinutes);
+  }, [blockMinutes]);
+
+  const nightExceedsBlock = useMemo(
+    () => night.trim().length > 0 && nightExceedsBlockTime(night, outTime, inTime),
+    [night, outTime, inTime]
+  );
+
+  // When Out/In block time shrinks, cap night time to the new block maximum.
+  useEffect(() => {
+    if (blockMinutes === null) return;
+    setNight((current) => {
+      if (!current.trim()) return current;
+      const nightMinutes = toMinutes(current);
+      if (nightMinutes !== null && nightMinutes > blockMinutes) {
+        return minutesToHHMM(blockMinutes);
+      }
+      return current;
+    });
+  }, [blockMinutes]);
 
   const formInput = useMemo<FlightSaveInput>(
     () => ({
@@ -347,32 +371,17 @@ export default function AddFlightScreen() {
       setPrefilling(true);
       setDate(formatDateISO(new Date()));
 
-      const [{ data: lastFlight }, profile] = await Promise.all([
+      const [{ data: lastFlight }, { data: profile }] = await Promise.all([
         fetchLastFlightDefaults(userId),
         getProfile(userId),
       ]);
 
       if (cancelled) return;
 
-      if (lastFlight) {
-        setFlightNo(lastFlight.flight_number || '');
-        setRegistration(lastFlight.aircraft_registration || '');
-        setAircraftType(lastFlight.aircraft_type || '');
-        setFrom(lastFlight.origin_iata || '');
-        setTo(lastFlight.destination_iata || '');
-        setCoPilotName(lastFlight.co_pilot_name || '');
-        setTakeoffs(String(lastFlight.takeoffs ?? 1));
-        setLandings(String(lastFlight.landings ?? 1));
-        setGoArounds(String(lastFlight.go_arounds ?? 0));
-        if (lastFlight.operating_capacity) setOperatingCapacity(lastFlight.operating_capacity);
-        if (lastFlight.pic_name) setPicName(lastFlight.pic_name);
-      }
-
-      if (!lastFlight?.pic_name && profile?.full_name) {
-        setPicName(profile.full_name);
-      }
-      if (!lastFlight?.operating_capacity && profile?.default_operating_capacity) {
+      if (profile?.default_operating_capacity) {
         setOperatingCapacity(profile.default_operating_capacity);
+      } else if (lastFlight?.operating_capacity) {
+        setOperatingCapacity(lastFlight.operating_capacity);
       }
 
       setPrefilling(false);
@@ -396,7 +405,6 @@ export default function AddFlightScreen() {
     if (
       !date.trim() ||
       !registration.trim() ||
-      !aircraftType.trim() ||
       !from.trim() ||
       !to.trim() ||
       !operatingCapacity
@@ -408,6 +416,18 @@ export default function AddFlightScreen() {
     if (!picName.trim()) {
       setError('PIC name is required.');
       return;
+    }
+
+    if (night.trim()) {
+      const block = blockMinutesFromOutIn(outTime, inTime);
+      if (block === null) {
+        setError('Enter Out and In time before logging Night time.');
+        return;
+      }
+      if (nightExceedsBlockTime(night, outTime, inTime)) {
+        setError('Night time cannot exceed total block time (Out–In).');
+        return;
+      }
     }
 
     setSaving(true);
@@ -457,6 +477,15 @@ export default function AddFlightScreen() {
   };
 
   const busy = loadingFlight || prefilling;
+
+  const handleOutTimeChange = (text: string) => {
+    setOutTime(text);
+    const complete = isCompleteTimeEntry(text);
+    if (complete && !outTimeWasCompleteRef.current) {
+      inTimeRef.current?.focus();
+    }
+    outTimeWasCompleteRef.current = complete;
+  };
 
   return (
     <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-slate-50 dark:bg-slate-950">
@@ -511,7 +540,7 @@ export default function AddFlightScreen() {
             autoCapitalize="characters"
           />
         </FieldRow>
-        <FieldRow label="A/c Type" required>
+        <FieldRow label="A/c Type">
           <SearchablePresetField
             value={aircraftType}
             onChange={setAircraftType}
@@ -557,10 +586,28 @@ export default function AddFlightScreen() {
         </FieldRow>
 
         <FieldRow label="Out Time">
-          <TextField value={outTime} onChangeText={setOutTime} placeholder="HH:MM or 0930" keyboardType="numeric" />
+          <TextInput
+            value={outTime}
+            onChangeText={handleOutTimeChange}
+            onSubmitEditing={() => inTimeRef.current?.focus()}
+            returnKeyType="next"
+            blurOnSubmit={false}
+            placeholder="HH:MM or 0930"
+            placeholderTextColor="#64748b"
+            keyboardType="numeric"
+            className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+          />
         </FieldRow>
         <FieldRow label="In Time">
-          <TextField value={inTime} onChangeText={setInTime} placeholder="HH:MM or 1030" keyboardType="numeric" />
+          <TextInput
+            ref={inTimeRef}
+            value={inTime}
+            onChangeText={setInTime}
+            placeholder="HH:MM or 1030"
+            placeholderTextColor="#64748b"
+            keyboardType="numeric"
+            className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+          />
         </FieldRow>
         <View className="mb-4 ml-[9.75rem] rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 dark:border-blue-900/50 dark:bg-blue-950/40">
           <Text className="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
@@ -613,7 +660,17 @@ export default function AddFlightScreen() {
         </View>
 
         <FieldRow label="Night">
-          <TextField value={night} onChangeText={setNight} placeholder="HH:MM" keyboardType="numeric" />
+          <View className="flex-1">
+            <TextField value={night} onChangeText={setNight} placeholder="HH:MM" keyboardType="numeric" />
+            {blockMinutes !== null && blockMinutes > 0 ? (
+              <Text className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Max {formatDuration(blockMinutes)} (block time)
+              </Text>
+            ) : null}
+            {nightExceedsBlock ? (
+              <Text className="mt-1 text-xs text-red-400">Night time cannot exceed block time.</Text>
+            ) : null}
+          </View>
         </FieldRow>
         <FieldRow label="IFR Actual">
           <TextField value={ifrActual} onChangeText={setIfrActual} placeholder="HH:MM" keyboardType="numeric" />
@@ -669,32 +726,31 @@ export default function AddFlightScreen() {
         </Pressable>
       </ScrollView>
 
-      <Modal visible={capacityOpen} transparent animationType="slide" onRequestClose={() => setCapacityOpen(false)}>
-        <View className="flex-1 justify-end bg-black/60">
-          <View className="max-h-[70%] rounded-t-2xl bg-white px-4 pb-6 pt-4 dark:bg-slate-900">
-            <View className="mb-2 flex-row items-center justify-between">
-              <Text className="text-lg font-bold text-slate-900 dark:text-white">Operating Capacity</Text>
-              <Pressable onPress={() => setCapacityOpen(false)}>
-                <Text className="text-sm font-semibold text-blue-400">Close</Text>
-              </Pressable>
-            </View>
-            <ScrollView>
-              {DEFAULT_CAPACITY_OPTIONS.map((option) => (
-                <Pressable
-                  key={option.value}
-                  onPress={() => {
-                    setOperatingCapacity(option.value);
-                    setCapacityOpen(false);
-                  }}
-                  className="flex-row items-center justify-between border-b border-slate-200 py-4 dark:border-slate-800">
-                  <Text className="text-base text-slate-800 dark:text-slate-100">{option.label}</Text>
-                  {option.value === operatingCapacity ? <FontAwesome name="check" size={14} color="#60a5fa" /> : null}
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
+      <BottomSheetModal
+        visible={capacityOpen}
+        onClose={() => setCapacityOpen(false)}
+        sheetClassName="max-h-[70%] rounded-t-2xl bg-white px-4 pb-6 pt-4 dark:bg-slate-900">
+        <View className="mb-2 flex-row items-center justify-between">
+          <Text className="text-lg font-bold text-slate-900 dark:text-white">Operating Capacity</Text>
+          <Pressable onPress={() => setCapacityOpen(false)}>
+            <Text className="text-sm font-semibold text-blue-400">Close</Text>
+          </Pressable>
         </View>
-      </Modal>
+        <ScrollView>
+          {DEFAULT_CAPACITY_OPTIONS.map((option) => (
+            <Pressable
+              key={option.value}
+              onPress={() => {
+                setOperatingCapacity(option.value);
+                setCapacityOpen(false);
+              }}
+              className="flex-row items-center justify-between border-b border-slate-200 py-4 dark:border-slate-800">
+              <Text className="text-base text-slate-800 dark:text-slate-100">{option.label}</Text>
+              {option.value === operatingCapacity ? <FontAwesome name="check" size={14} color="#60a5fa" /> : null}
+            </Pressable>
+          ))}
+        </ScrollView>
+      </BottomSheetModal>
     </SafeAreaView>
   );
 }

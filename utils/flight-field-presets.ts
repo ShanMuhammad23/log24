@@ -24,10 +24,26 @@ export function emptyFlightFieldPresets(): FlightFieldPresetsMap {
   return { ...EMPTY_PRESETS };
 }
 
+/** Case-insensitive unique preset values (fixes duplicate dropdown entries). */
+export function dedupePresetOptions(options: string[]): string[] {
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const option of options) {
+    const trimmed = option.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(trimmed);
+  }
+  return unique.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+}
+
 export function filterPresetOptions(options: string[], query: string): string[] {
+  const deduped = dedupePresetOptions(options);
   const q = query.trim().toLowerCase();
-  if (!q) return options;
-  return options.filter((option) => option.toLowerCase().includes(q));
+  if (!q) return deduped;
+  return deduped.filter((option) => option.toLowerCase().includes(q));
 }
 
 export async function fetchFlightFieldPresets(userId: string): Promise<FlightFieldPresetsMap> {
@@ -48,6 +64,9 @@ export async function fetchFlightFieldPresets(userId: string): Promise<FlightFie
     const value = (row.value || '').trim();
     if (!value) continue;
     grouped[fieldType].push(value);
+  }
+  for (const fieldType of FLIGHT_FIELD_TYPES) {
+    grouped[fieldType] = dedupePresetOptions(grouped[fieldType]);
   }
   return grouped;
 }
@@ -93,8 +112,8 @@ export async function syncFlightFieldPresetsFromForm(
 
 export function mergePresetOption(options: string[], value: string): string[] {
   const trimmed = value.trim();
-  if (!trimmed) return options;
+  if (!trimmed) return dedupePresetOptions(options);
   const exists = options.some((o) => o.toLowerCase() === trimmed.toLowerCase());
-  if (exists) return options;
-  return [trimmed, ...options].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  if (exists) return dedupePresetOptions(options);
+  return dedupePresetOptions([trimmed, ...options]);
 }

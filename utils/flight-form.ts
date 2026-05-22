@@ -109,6 +109,29 @@ export function blockMinutesFromOutIn(outTime: string, inTime: string) {
   return input >= out ? input - out : 24 * 60 - out + input;
 }
 
+/** True when Out/In entry is finished (4-digit compact or full HH:MM). Used for auto-focus only. */
+export function isCompleteTimeEntry(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (trimmed.includes(':')) {
+    return /^\d{1,2}:\d{2}$/.test(trimmed) && toMinutes(trimmed) !== null;
+  }
+  const digits = trimmed.replace(/[^\d]/g, '');
+  if (digits.length === 4) {
+    return toMinutes(trimmed) !== null;
+  }
+  return false;
+}
+
+/** True when night duration exceeds block time from Out/In. */
+export function nightExceedsBlockTime(night: string, outTime: string, inTime: string) {
+  const nightMinutes = toMinutes(night);
+  if (nightMinutes === null || nightMinutes <= 0) return false;
+  const blockMinutes = blockMinutesFromOutIn(outTime, inTime);
+  if (blockMinutes === null) return true;
+  return nightMinutes > blockMinutes;
+}
+
 export function parseCount(value: string, fallback = 0) {
   const parsed = Number.parseInt(value.trim(), 10);
   if (Number.isNaN(parsed) || parsed < 0) return fallback;
@@ -157,7 +180,7 @@ export function buildFlightSavePayload(input: FlightSaveInput): Record<string, u
   return {
     flight_date: input.date.trim(),
     flight_number: input.flightNo.trim() || null,
-    aircraft_type: input.aircraftType.trim(),
+    aircraft_type: input.aircraftType.trim() || null,
     aircraft_registration: input.registration.trim(),
     origin_iata: input.from.trim().toUpperCase(),
     destination_iata: input.to.trim().toUpperCase(),
