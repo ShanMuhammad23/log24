@@ -15,6 +15,7 @@ import {
   fetchPilotDocuments,
   PilotDocument,
 } from '@/utils/documents';
+import { syncDocumentExpiryNotifications } from '@/utils/document-notifications';
 
 type FilterTab = 'all' | 'expiring_soon' | 'expired' | 'valid';
 
@@ -284,6 +285,7 @@ export default function DocsScreen() {
             }
 
             setDocuments((prev) => prev.filter((item) => item.id !== docId));
+            await syncDocumentExpiryNotifications(userId);
           },
         },
       ]);

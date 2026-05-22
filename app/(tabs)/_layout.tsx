@@ -1,12 +1,14 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
-import { Redirect, Tabs, router } from 'expo-router';
+import * as Notifications from 'expo-notifications';
+import { Redirect, Tabs, router, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { useSupabaseSession } from '@/utils/auth';
+import { syncDocumentExpiryNotifications } from '@/utils/document-notifications';
 import { getProfile } from '@/utils/profile';
 
 const HERO_BLUE = '#1d4ed8';
@@ -77,9 +79,20 @@ function HomeTabBarButton(props: BottomTabBarButtonProps) {
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const appRouter = useRouter();
   const { session, loading } = useSupabaseSession();
   const [checkingOnboarding, setCheckingOnboarding] = useState(true);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const documentId = response.notification.request.content.data?.documentId;
+      if (typeof documentId === 'string') {
+        appRouter.push(`/document-details/${documentId}`);
+      }
+    });
+    return () => sub.remove();
+  }, [appRouter]);
 
   useEffect(() => {
     const checkOnboarding = async () => {
@@ -96,6 +109,14 @@ export default function TabLayout() {
     };
 
     checkOnboarding();
+  }, [session?.user?.id]);
+
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId) return;
+    syncDocumentExpiryNotifications(userId).catch((err) => {
+      console.warn('Document notification sync failed:', err);
+    });
   }, [session?.user?.id]);
 
   if (loading) return null;

@@ -5,8 +5,10 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { ThemeProvider } from '@/contexts/ThemeProvider';
 import { useAppFonts } from '@/hooks/useAppFonts';
+import { configureDocumentNotificationHandler } from '@/utils/document-notifications';
 
 SplashScreen.preventAutoHideAsync();
+configureDocumentNotificationHandler();
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useAppFonts();

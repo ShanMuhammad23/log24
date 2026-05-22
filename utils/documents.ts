@@ -41,6 +41,32 @@ export function daysUntilExpiry(expiryDate: string | null) {
   return Math.floor((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
 
+const DEFAULT_REMINDER_HOUR = 9;
+
+/** Calendar date when the expiry reminder window starts (expiry minus reminder days), 9:00 local. */
+export function reminderNotificationDate(expiryDate: string, reminderDaysBefore: number) {
+  const expiry = parseLocalDateOnly(expiryDate);
+  if (!expiry || Number.isNaN(expiry.getTime())) return null;
+  const reminder = new Date(expiry);
+  reminder.setDate(reminder.getDate() - reminderDaysBefore);
+  reminder.setHours(DEFAULT_REMINDER_HOUR, 0, 0, 0);
+  return reminder;
+}
+
+/** Expiry day at 9:00 local for final expiry notification. */
+export function expiryNotificationDate(expiryDate: string) {
+  const expiry = parseLocalDateOnly(expiryDate);
+  if (!expiry || Number.isNaN(expiry.getTime())) return null;
+  expiry.setHours(DEFAULT_REMINDER_HOUR, 0, 0, 0);
+  return expiry;
+}
+
+export function formatDocumentNotificationDate(expiryDate: string) {
+  const date = parseLocalDateOnly(expiryDate);
+  if (!date) return expiryDate;
+  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
 export function computeDocumentStatus(
   expiryDate: string | null,
   reminderDaysBefore = 15

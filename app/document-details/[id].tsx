@@ -14,6 +14,7 @@ import {
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSupabaseSession } from '@/utils/auth';
+import { syncDocumentExpiryNotifications } from '@/utils/document-notifications';
 import {
   createPilotDocumentSignedUrl,
   deletePilotDocument,
@@ -137,6 +138,7 @@ export default function DocumentDetailsScreen() {
             Alert.alert('Delete failed', documentErrorMessage(error));
             return;
           }
+          await syncDocumentExpiryNotifications(userId);
           router.replace('/(tabs)/docs');
         },
       },

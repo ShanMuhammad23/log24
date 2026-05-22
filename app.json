@@ -33,7 +33,14 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/logo.jpeg",
+          "color": "#1d4ed8"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

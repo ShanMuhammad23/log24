@@ -13,6 +13,7 @@ import {
   formatDocumentFileSize,
   updatePilotDocument,
 } from '@/utils/documents';
+import { syncDocumentExpiryNotifications } from '@/utils/document-notifications';
 import { supabase } from '@/utils/supabase';
 
 export default function AddDocumentScreen() {
@@ -186,6 +187,7 @@ export default function AddDocumentScreen() {
       });
     }
 
+    await syncDocumentExpiryNotifications(userId);
     router.back();
   };
 
