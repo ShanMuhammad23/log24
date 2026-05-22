@@ -7,15 +7,21 @@ import { ThemeProvider } from '@/contexts/ThemeProvider';
 import { useAppFonts } from '@/hooks/useAppFonts';
 import { configureDocumentNotificationHandler } from '@/utils/document-notifications';
 
-SplashScreen.preventAutoHideAsync();
-configureDocumentNotificationHandler();
-
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useAppFonts();
 
   useEffect(() => {
+    SplashScreen.preventAutoHideAsync().catch(() => undefined);
+    try {
+      configureDocumentNotificationHandler();
+    } catch (error) {
+      console.warn('Notification handler setup failed:', error);
+    }
+  }, []);
+
+  useEffect(() => {
     if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync();
+      SplashScreen.hideAsync().catch(() => undefined);
     }
   }, [fontsLoaded, fontError]);
 

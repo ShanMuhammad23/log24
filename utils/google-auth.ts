@@ -1,5 +1,5 @@
 import Constants from 'expo-constants';
-import { Platform, TurboModuleRegistry } from 'react-native';
+import { Platform } from 'react-native';
 import { supabase } from '@/utils/supabase';
 
 /**
@@ -36,7 +36,12 @@ export function isGoogleSignInConfigured() {
 export function isNativeGoogleSignInAvailable() {
   if (Platform.OS === 'web') return false;
   if (Constants.appOwnership === 'expo') return false;
-  return TurboModuleRegistry.get('RNGoogleSignin') != null;
+  try {
+    const { TurboModuleRegistry } = require('react-native') as typeof import('react-native');
+    return TurboModuleRegistry.get('RNGoogleSignin') != null;
+  } catch {
+    return false;
+  }
 }
 
 async function loadGoogleSignInModule(): Promise<GoogleSignInModule | null> {
