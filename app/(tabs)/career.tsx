@@ -33,22 +33,22 @@ function ColumnSummaryHeader({
   const progress = percentFromMinutes(currentMinutes, targetMinutes);
 
   return (
-    <View className="mb-3 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
-      <Text className="text-center text-sm font-bold uppercase tracking-wide text-slate-700 dark:text-slate-200">
+    <View className="mb-1.5 rounded-xl border border-slate-200 bg-white px-2 py-1.5 dark:border-slate-700 dark:bg-slate-900">
+      <Text className="text-center text-[11px] font-bold uppercase tracking-wide text-slate-700 dark:text-slate-200">
         {title}
       </Text>
-      <View className="mt-2 flex-row items-end justify-center">
-        <Text className="text-3xl font-bold text-slate-900 dark:text-slate-100">
+      <View className="mt-1 flex-row items-end justify-center">
+        <Text className="text-lg font-bold text-slate-900 dark:text-slate-100">
           {formatCareerHours(currentMinutes)}
         </Text>
-        <Text className="mb-0.5 ml-1.5 text-base font-medium text-slate-500 dark:text-slate-400">
-          / {formatCareerHours(targetMinutes)} Hr
+        <Text className="mb-px ml-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+          / {formatCareerHours(targetMinutes)}
         </Text>
       </View>
-      <View className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+      <View className="mt-1 h-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
         <View className="h-full rounded-full" style={{ width: `${progress}%`, backgroundColor: accentColor }} />
       </View>
-      <Text className="mt-1.5 text-center text-xs font-semibold" style={{ color: accentColor }}>
+      <Text className="mt-0.5 text-center text-[10px] font-semibold" style={{ color: accentColor }}>
         {progress}%
       </Text>
     </View>
@@ -77,78 +77,120 @@ function RequirementCard({
 
   return (
     <View
-      className={`mb-2 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900 ${
-        fullWidth ? 'w-full' : 'mb-3 w-[48.5%]'
+      className={`rounded-xl border border-slate-200 bg-white px-2 py-1.5 dark:border-slate-700 dark:bg-slate-900 ${
+        fullWidth ? 'mb-1 w-full' : 'mb-3 w-[48.5%]'
       }`}>
-      <View className="flex-row items-start gap-2">
-        <View className="h-11 w-11 items-center justify-center rounded-full" style={{ backgroundColor: `${accentColor}20` }}>
-          <FontAwesome name={icon} size={20} color={accentColor} />
+      <View className="flex-row items-center gap-1.5">
+        <View
+          className="h-7 w-7 shrink-0 items-center justify-center rounded-full"
+          style={{ backgroundColor: `${accentColor}20` }}>
+          <FontAwesome name={icon} size={12} color={accentColor} />
         </View>
-        <View className="flex-1">
-          <Text className="text-base font-semibold text-slate-900 dark:text-slate-100">{title}</Text>
-          <Text className="text-sm text-slate-500 dark:text-slate-400">{minimumLabel}</Text>
-        </View>
-      </View>
-
-      <View className="mt-2 flex-row items-end justify-between">
-        <Text className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{formatCareerHours(currentMinutes)}</Text>
-        {hasTarget ? (
-          <Text className="mb-0.5 text-base font-medium text-slate-500 dark:text-slate-400">
-            / {formatCareerHours(targetMinutes)}
+        <View className="min-w-0 flex-1">
+          <Text className="text-xs font-semibold text-slate-900 dark:text-slate-100" numberOfLines={1}>
+            {title}
           </Text>
-        ) : null}
+          {minimumLabel ? (
+            <Text className="text-[10px] text-slate-500 dark:text-slate-400" numberOfLines={1}>
+              {minimumLabel}
+            </Text>
+          ) : null}
+        </View>
+        <View className="shrink-0 items-end">
+          <Text className="text-sm font-bold text-slate-900 dark:text-slate-100">
+            {formatCareerHours(currentMinutes)}
+          </Text>
+          {hasTarget ? (
+            <Text className="text-[10px] font-medium text-slate-500 dark:text-slate-400">
+              / {formatCareerHours(targetMinutes!)}
+            </Text>
+          ) : null}
+        </View>
       </View>
 
       {hasTarget ? (
-        <View className="mt-2 flex-row items-center gap-2">
-          <View className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+        <View className="mt-1 flex-row items-center gap-1">
+          <View className="h-1 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
             <View className="h-full rounded-full" style={{ width: `${progress}%`, backgroundColor: accentColor }} />
           </View>
-          <View className="rounded-lg bg-slate-100 px-2 py-1 dark:bg-slate-800">
-            <Text className="text-sm font-semibold" style={{ color: accentColor }}>
-              {progress}%
-            </Text>
-          </View>
+          <Text className="text-[10px] font-semibold" style={{ color: accentColor }}>
+            {progress}%
+          </Text>
         </View>
       ) : null}
     </View>
   );
 }
 
-function DetailRow({ label, minutes }: { label: string; minutes: number }) {
-  return (
-    <View className="flex-row items-center justify-between py-1">
-      <Text className="text-sm text-slate-600 dark:text-slate-300">{label}</Text>
-      <Text className="text-sm font-semibold text-slate-900 dark:text-slate-100">{formatCareerHours(minutes)}</Text>
-    </View>
-  );
-}
+type BreakdownTableRow =
+  | { type: 'data'; label: string; minutes: number }
+  | { type: 'section'; label: string };
 
-function DetailRequirementCard({
+function BreakdownTableSection({
   title,
   subtitle,
   icon,
   accentColor,
-  children,
+  rows,
 }: {
   title: string;
-  subtitle: string;
+  subtitle?: string;
   icon: React.ComponentProps<typeof FontAwesome>['name'];
   accentColor: string;
-  children: React.ReactNode;
+  rows: BreakdownTableRow[];
 }) {
   return (
-    <View className="mb-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-      <View className="mb-2 flex-row items-center gap-3">
-        <View className="h-10 w-10 items-center justify-center rounded-full" style={{ backgroundColor: `${accentColor}20` }}>
-          <FontAwesome name={icon} size={18} color={accentColor} />
+    <View className="mb-2 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+      <View
+        className="flex-row items-center gap-1.5 border-b border-slate-200 px-2 py-1.5 dark:border-slate-700"
+        style={{ backgroundColor: `${accentColor}12` }}>
+        <View className="h-6 w-6 items-center justify-center rounded-full" style={{ backgroundColor: `${accentColor}25` }}>
+          <FontAwesome name={icon} size={11} color={accentColor} />
         </View>
-        <View className="flex-1">
-          <Text className="text-lg font-semibold text-slate-900 dark:text-slate-100">{title}</Text>
-          <Text className="text-sm text-slate-500 dark:text-slate-400">{subtitle}</Text>
+        <View className="min-w-0 flex-1">
+          <Text className="text-xs font-semibold text-slate-900 dark:text-slate-100">{title}</Text>
+          {subtitle ? (
+            <Text className="text-[10px] text-slate-500 dark:text-slate-400" numberOfLines={1}>
+              {subtitle}
+            </Text>
+          ) : null}
         </View>
       </View>
-      {children}
+
+      <View className="flex-row border-b border-slate-200 bg-slate-100 px-2 py-1 dark:border-slate-700 dark:bg-slate-800/80">
+        <Text className="flex-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">
+          Category
+        </Text>
+        <Text className="w-[52px] text-right text-[10px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">
+          Hours
+        </Text>
+      </View>
+
+      {rows.map((row, index) => {
+        if (row.type === 'section') {
+          return (
+            <View
+              key={`${row.label}-${index}`}
+              className="border-b border-slate-100 bg-slate-50 px-2 py-1 dark:border-slate-800 dark:bg-slate-800/50">
+              <Text className="text-[10px] font-semibold uppercase text-slate-600 dark:text-slate-400">
+                {row.label}
+              </Text>
+            </View>
+          );
+        }
+
+        const isLast = index === rows.length - 1;
+        return (
+          <View
+            key={`${row.label}-${index}`}
+            className={`flex-row items-center px-2 py-1 ${isLast ? '' : 'border-b border-slate-100 dark:border-slate-800'}`}>
+            <Text className="flex-1 text-xs text-slate-700 dark:text-slate-300">{row.label}</Text>
+            <Text className="w-[52px] text-right text-xs font-semibold text-slate-900 dark:text-slate-100">
+              {formatCareerHours(row.minutes)}
+            </Text>
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -220,15 +262,15 @@ export default function CareerScreen() {
                 </View>
               </View>
 
-              <View className="mb-3 flex-row items-center justify-between">
-                <Text className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Hour Summary</Text>
+              <View className="mb-2 flex-row items-center justify-between">
+                <Text className="text-xl font-semibold text-slate-900 dark:text-slate-100">Hour Summary</Text>
                 <Pressable className="flex-row items-center gap-1">
                   <FontAwesome name="info-circle" size={14} color="#2563eb" />
                   <Text className="text-sm font-medium text-blue-600 dark:text-blue-400">DGCA Requirements</Text>
                 </Pressable>
               </View>
 
-              <View className="mb-3 flex-row items-start gap-2">
+              <View className="mb-2 flex-row items-start gap-1.5">
                 <View className="flex-1">
                   <ColumnSummaryHeader
                     title="Solo PIC"
@@ -328,83 +370,87 @@ export default function CareerScreen() {
                 </View>
               </View>
 
-              <Text className="mb-3 mt-1 text-xl font-semibold text-slate-900 dark:text-slate-100">Flight Breakdown</Text>
+              <Text className="mb-2 mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">Flight Breakdown</Text>
 
-              <DetailRequirementCard
+              <BreakdownTableSection
                 title="Checks"
-                subtitle="Examiner flights — 250, 120, day, night, IRT, night PIC"
+                subtitle="Examiner flights"
                 icon="check-circle"
                 accentColor="#2563eb"
-              >
-                <DetailRow label="250" minutes={summary.checks.hour250} />
-                <DetailRow label="120" minutes={summary.checks.hour120} />
-                <DetailRow label="Day" minutes={summary.checks.day} />
-                <DetailRow label="Night" minutes={summary.checks.night} />
-                <DetailRow label="IRT" minutes={summary.checks.irt} />
-                <DetailRow label="Night PIC" minutes={summary.checks.nightPic} />
-              </DetailRequirementCard>
+                rows={[
+                  { type: 'data', label: '250', minutes: summary.checks.hour250 },
+                  { type: 'data', label: '120', minutes: summary.checks.hour120 },
+                  { type: 'data', label: 'Day', minutes: summary.checks.day },
+                  { type: 'data', label: 'Night', minutes: summary.checks.night },
+                  { type: 'data', label: 'IRT', minutes: summary.checks.irt },
+                  { type: 'data', label: 'Night PIC', minutes: summary.checks.nightPic },
+                ]}
+              />
 
-              <DetailRequirementCard
-                title="PIC Logbook Breakdown"
-                subtitle="CCTS, XCTY, GFT checks, multi checks"
+              <BreakdownTableSection
+                title="PIC Logbook"
+                subtitle="From PIC log entries"
                 icon="user"
                 accentColor="#0d9488"
-              >
-                <DetailRow label="CCTS Day" minutes={summary.pic.breakdown.cctsDay} />
-                <DetailRow label="CCTS Night" minutes={summary.pic.breakdown.cctsNight} />
-                <DetailRow label="XCTY" minutes={summary.pic.breakdown.xcty} />
-                <DetailRow label="Night" minutes={summary.pic.breakdown.night} />
-                <Text className="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-200">GFT Checks</Text>
-                <DetailRow label="300 NM (GFT)" minutes={summary.pic.breakdown.gft300nm} />
-                <DetailRow label="250 NM" minutes={summary.pic.breakdown.gft250nm} />
-                <DetailRow label="120 NM" minutes={summary.pic.breakdown.gft120nm} />
-                <DetailRow label="Day" minutes={summary.pic.breakdown.gftDay} />
-                <DetailRow label="Night" minutes={summary.pic.breakdown.gftNight} />
-                <Text className="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-200">Multi Checks</Text>
-                <DetailRow label="Day" minutes={summary.pic.breakdown.multiDay} />
-                <DetailRow label="Night" minutes={summary.pic.breakdown.multiNight} />
-                <DetailRow label="IRT" minutes={summary.pic.breakdown.multiIrt} />
-              </DetailRequirementCard>
+                rows={[
+                  { type: 'data', label: 'CCTS Day', minutes: summary.pic.breakdown.cctsDay },
+                  { type: 'data', label: 'CCTS Night', minutes: summary.pic.breakdown.cctsNight },
+                  { type: 'data', label: 'XCTY', minutes: summary.pic.breakdown.xcty },
+                  { type: 'data', label: 'Night', minutes: summary.pic.breakdown.night },
+                  { type: 'section', label: 'GFT Checks' },
+                  { type: 'data', label: '300 NM (GFT)', minutes: summary.pic.breakdown.gft300nm },
+                  { type: 'data', label: '250 NM', minutes: summary.pic.breakdown.gft250nm },
+                  { type: 'data', label: '120 NM', minutes: summary.pic.breakdown.gft120nm },
+                  { type: 'data', label: 'Day', minutes: summary.pic.breakdown.gftDay },
+                  { type: 'data', label: 'Night', minutes: summary.pic.breakdown.gftNight },
+                  { type: 'section', label: 'Multi Checks' },
+                  { type: 'data', label: 'Day', minutes: summary.pic.breakdown.multiDay },
+                  { type: 'data', label: 'Night', minutes: summary.pic.breakdown.multiNight },
+                  { type: 'data', label: 'IRT', minutes: summary.pic.breakdown.multiIrt },
+                ]}
+              />
 
-              <DetailRequirementCard
+              <BreakdownTableSection
                 title="PIC Breakdown"
-                subtitle="XC, 250, 120, GFT (day, night, IRT, night PIC)"
+                subtitle="XC, 250, 120, GFT"
                 icon="user"
                 accentColor="#0d9488"
-              >
-                <DetailRow label="XC" minutes={summary.pic.xc} />
-                <DetailRow label="250" minutes={summary.pic.hour250} />
-                <DetailRow label="120" minutes={summary.pic.hour120} />
-                <Text className="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-200">GFT</Text>
-                <DetailRow label="Day" minutes={summary.pic.gft.day} />
-                <DetailRow label="Night" minutes={summary.pic.gft.night} />
-                <DetailRow label="IRT" minutes={summary.pic.gft.irt} />
-                <DetailRow label="Night PIC" minutes={summary.pic.gft.nightPic} />
-              </DetailRequirementCard>
+                rows={[
+                  { type: 'data', label: 'XC', minutes: summary.pic.xc },
+                  { type: 'data', label: '250', minutes: summary.pic.hour250 },
+                  { type: 'data', label: '120', minutes: summary.pic.hour120 },
+                  { type: 'section', label: 'GFT' },
+                  { type: 'data', label: 'Day', minutes: summary.pic.gft.day },
+                  { type: 'data', label: 'Night', minutes: summary.pic.gft.night },
+                  { type: 'data', label: 'IRT', minutes: summary.pic.gft.irt },
+                  { type: 'data', label: 'Night PIC', minutes: summary.pic.gft.nightPic },
+                ]}
+              />
 
-              <DetailRequirementCard
+              <BreakdownTableSection
                 title="Instrument Flying"
-                subtitle={`Total ${formatCareerHours(summary.instrumentBreakdown.total)} — IF vs dual`}
+                subtitle={`Total ${formatCareerHours(summary.instrumentBreakdown.total)}`}
                 icon="dot-circle-o"
                 accentColor="#ea580c"
-              >
-                <DetailRow label="IF" minutes={summary.instrumentBreakdown.ifActual} />
-                <DetailRow label="Dual" minutes={summary.instrumentBreakdown.ifDual} />
-              </DetailRequirementCard>
+                rows={[
+                  { type: 'data', label: 'IF', minutes: summary.instrumentBreakdown.ifActual },
+                  { type: 'data', label: 'Dual', minutes: summary.instrumentBreakdown.ifDual },
+                ]}
+              />
 
-              <DetailRequirementCard
+              <BreakdownTableSection
                 title="Dual Breakdown"
-                subtitle={`Total ${formatCareerHours(summary.dualBreakdown.total)} — extra, night, IF, multi`}
+                subtitle={`Total ${formatCareerHours(summary.dualBreakdown.total)}`}
                 icon="users"
                 accentColor="#7c3aed"
-              >
-                <DetailRow label="Extra / Other" minutes={summary.dualBreakdown.extra} />
-                <DetailRow label="Night" minutes={summary.dualBreakdown.night} />
-                <DetailRow label="IF" minutes={summary.dualBreakdown.instrument} />
-                <DetailRow label="Multi" minutes={summary.dualBreakdown.multi} />
-              </DetailRequirementCard>
+                rows={[
+                  { type: 'data', label: 'Extra / Other', minutes: summary.dualBreakdown.extra },
+                  { type: 'data', label: 'Night', minutes: summary.dualBreakdown.night },
+                  { type: 'data', label: 'IF', minutes: summary.dualBreakdown.instrument },
+                  { type: 'data', label: 'Multi', minutes: summary.dualBreakdown.multi },
+                ]}
+              />
 
-            
             </>
           )}
         </ScrollView>
