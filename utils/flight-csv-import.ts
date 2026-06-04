@@ -1,4 +1,10 @@
 import * as XLSX from 'xlsx';
+import { deriveRoleTimeMinutes } from '@/utils/flight-form';
+import {
+  picBreakdownToDbPayload,
+  sumPicBreakdownMinutes,
+  type PicBreakdownMinutes,
+} from '@/utils/pic-breakdown';
 
 export const REQUIRED_CSV_HEADERS = [
   'Date of Flight',
@@ -48,6 +54,13 @@ export const CSV_HEADERS = [
 
 export type CsvFlightRow = Record<(typeof CSV_HEADERS)[number], string>;
 
+export type DualBreakdownMinutes = {
+  extra: number | null;
+  night: number | null;
+  instrument: number | null;
+  multi: number | null;
+};
+
 export type FlightInsertPayload = {
   user_id: string;
   flight_date: string;
@@ -59,6 +72,7 @@ export type FlightInsertPayload = {
   out_time: string | null;
   in_time: string | null;
   block_time_minutes: number | null;
+  total_time_minutes: number | null;
   pic_time_minutes: number | null;
   sic_time_minutes: number | null;
   night_time_minutes: number | null;
@@ -72,6 +86,22 @@ export type FlightInsertPayload = {
   co_pilot_name: string | null;
   operating_capacity: string | null;
   remarks: string | null;
+  dual_extra_minutes: number | null;
+  dual_night_minutes: number | null;
+  dual_if_minutes: number | null;
+  dual_multi_minutes: number | null;
+  pic_ccts_day_minutes: number | null;
+  pic_ccts_night_minutes: number | null;
+  pic_xcty_minutes: number | null;
+  pic_night_category_minutes: number | null;
+  pic_gft_300nm_minutes: number | null;
+  pic_gft_250nm_minutes: number | null;
+  pic_gft_120nm_minutes: number | null;
+  pic_gft_day_minutes: number | null;
+  pic_gft_night_minutes: number | null;
+  pic_multi_day_minutes: number | null;
+  pic_multi_night_minutes: number | null;
+  pic_multi_irt_minutes: number | null;
 };
 
 export type ParsedImportRow = {
@@ -350,6 +380,119 @@ function inferOperatingCapacity(row: CsvFlightRow): string | null {
   return null;
 }
 
+function minutesOrNull(value: number): number | null {
+  return value > 0 ? value : null;
+}
+
+function sumDualBreakdownMinutes(breakdown: DualBreakdownMinutes) {
+  return (
+    (breakdown.extra || 0) +
+    (breakdown.night || 0) +
+    (breakdown.instrument || 0) +
+    (breakdown.multi || 0)
+  );
+}
+
+/** Map DGCA logbook dual columns → app dual breakdown fields. */
+export function mapCsvDualBreakdown(
+  row: CsvFlightRow,
+  capacity: string,
+  ifrActual: number | null,
+  ifrSimulated: number | null
+): DualBreakdownMinutes {
+  if (capacity !== 'dual') {
+    return { extra: null, night: null, instrument: null, multi: null };
+  }
+
+  const seDayDual = parseDurationToMinutes(row['S.E-Day-Dual(1)'] || '') || 0;
+  const seNightDual = parseDurationToMinutes(row['S.E-Night-Dual(4)'] || '') || 0;
+  const meDayDual = parseDurationToMinutes(row['M.E-Day-Dual(7)'] || '') || 0;
+  const meNightDual = parseDurationToMinutes(row['M.E-Night-Dual(11)'] || '') || 0;
+  const instrument = (ifrActual || 0) + (ifrSimulated || 0);
+
+  return {
+    extra: minutesOrNull(seDayDual),
+    night: minutesOrNull(seNightDual + meNightDual),
+    multi: minutesOrNull(meDayDual + meNightDual),
+    instrument: minutesOrNull(instrument),
+  };
+}
+
+/** Map DGCA logbook PIC columns → app PIC breakdown fields. */
+export function mapCsvPicBreakdown(
+  row: CsvFlightRow,
+  capacity: string,
+  crossCountryMinutes: number | null
+): PicBreakdownMinutes {
+  if (capacity !== 'pic' && capacity !== 'solo') {
+    return {
+      cctsDay: null,
+      cctsNight: null,
+      xcty: null,
+      nightCategory: null,
+      gft300nm: null,
+      gft250nm: null,
+      gft120nm: null,
+      gftDay: null,
+      gftNight: null,
+      multiDay: null,
+      multiNight: null,
+      multiIrt: null,
+    };
+  }
+
+  const seDayPic = parseDurationToMinutes(row['S.E-Day-PIC(2)'] || '') || 0;
+  const seNightPic = parseDurationToMinutes(row['S.E-Night-PIC(5)'] || '') || 0;
+  const meDayPic = parseDurationToMinutes(row['M.E-Day-PIC(8)'] || '') || 0;
+  const meNightPic = parseDurationToMinutes(row['M.E-Night-PIC(12)'] || '') || 0;
+  const meDayPius = parseDurationToMinutes(row['M.E-Day-PI(US)(10)'] || '') || 0;
+  const meNightPius = parseDurationToMinutes(row['M.E-Night-PI(US)(14)'] || '') || 0;
+  const ifrSimulated = parseDurationToMinutes(row['Instrument Flight Simulated(15)'] || '') || 0;
+  const ifrActual = parseDurationToMinutes(row['Instrument Flight Actual(16)'] || '') || 0;
+
+  return {
+    cctsDay: minutesOrNull(seDayPic),
+    cctsNight: minutesOrNull(seNightPic),
+    xcty: capacity === 'pic' ? crossCountryMinutes : null,
+    nightCategory: minutesOrNull(meNightPic + meNightPius),
+    gft300nm: null,
+    gft250nm: null,
+    gft120nm: null,
+    gftDay: null,
+    gftNight: null,
+    multiDay: minutesOrNull(meDayPic + meDayPius),
+    multiNight: minutesOrNull(meNightPic),
+    multiIrt: minutesOrNull(ifrActual + ifrSimulated),
+  };
+}
+
+function legacyPicMinutes(row: CsvFlightRow) {
+  return sumDurationFields(row, [
+    'S.E-Day-PIC(2)',
+    'S.E-Night-PIC(5)',
+    'M.E-Day-PIC(8)',
+    'M.E-Night-PIC(12)',
+    'M.E-Day-PI(US)(10)',
+    'M.E-Night-PI(US)(14)',
+  ]);
+}
+
+function legacySicMinutes(row: CsvFlightRow) {
+  const copilot = sumDurationFields(row, [
+    'S.E-Day-Co-pilot(3)',
+    'S.E-Night-Co-pilot(6)',
+    'M.E-Day-Co-pilot(9)',
+    'M.E-Night-Co-pilot(13)',
+  ]);
+  const dual = sumDurationFields(row, [
+    'S.E-Day-Dual(1)',
+    'S.E-Night-Dual(4)',
+    'M.E-Day-Dual(7)',
+    'M.E-Night-Dual(11)',
+  ]);
+  return copilot + dual;
+}
+
 function buildRemarks(row: CsvFlightRow): string | null {
   const parts: string[] = [];
   if (row.Remarks?.trim()) parts.push(row.Remarks.trim());
@@ -382,40 +525,24 @@ export function mapCsvRowToFlight(userId: string, row: CsvFlightRow): { payload:
 
   const inTime = parseTimeToHHMM(row['Flight Arrival Time'] || '');
 
-  const picMinutes = sumDurationFields(row, [
-    'S.E-Day-PIC(2)',
-    'S.E-Night-PIC(5)',
-    'M.E-Day-PIC(8)',
-    'M.E-Night-PIC(12)',
-    'M.E-Day-PI(US)(10)',
-    'M.E-Night-PI(US)(14)',
-  ]);
-  const sicMinutes = sumDurationFields(row, [
-    'S.E-Day-Co-pilot(3)',
-    'S.E-Night-Co-pilot(6)',
-    'M.E-Day-Co-pilot(9)',
-    'M.E-Night-Co-pilot(13)',
-  ]);
-  const dualMinutes = sumDurationFields(row, [
-    'S.E-Day-Dual(1)',
-    'S.E-Night-Dual(4)',
-    'M.E-Day-Dual(7)',
-    'M.E-Night-Dual(11)',
-  ]);
-  const nightMinutes = sumDurationFields(row, [
-    'S.E-Night-Dual(4)',
-    'S.E-Night-PIC(5)',
-    'S.E-Night-Co-pilot(6)',
-    'M.E-Night-Dual(11)',
-    'M.E-Night-PIC(12)',
-    'M.E-Night-Co-pilot(13)',
-    'M.E-Night-PI(US)(14)',
-  ]);
-
   const ifrSimulated = parseDurationToMinutes(row['Instrument Flight Simulated(15)'] || '');
   const ifrActual = parseDurationToMinutes(row['Instrument Flight Actual(16)'] || '');
   const instructional = parseDurationToMinutes(row['Instructional(17)'] || '');
-  const crossCountry = parseDurationToMinutes(row['Cross Country'] || '');
+  const crossCountryRaw = parseDurationToMinutes(row['Cross Country'] || '');
+
+  const operatingCapacity = inferOperatingCapacity(row) ?? '';
+  const picMinutesLegacy = legacyPicMinutes(row);
+  const sicMinutesLegacy = legacySicMinutes(row);
+
+  const dualBreakdown = mapCsvDualBreakdown(row, operatingCapacity, ifrActual, ifrSimulated);
+  const dualBreakdownTotal = sumDualBreakdownMinutes(dualBreakdown);
+
+  const picXctyForRow = operatingCapacity === 'pic' ? crossCountryRaw : null;
+  const picBreakdown = mapCsvPicBreakdown(row, operatingCapacity, picXctyForRow);
+  const picBreakdownTotal = sumPicBreakdownMinutes(picBreakdown);
+
+  const crossCountryTotal =
+    operatingCapacity !== 'pic' ? crossCountryRaw : null;
 
   let blockMinutes =
     inTime !== null
@@ -423,11 +550,43 @@ export function mapCsvRowToFlight(userId: string, row: CsvFlightRow): { payload:
       : null;
 
   if (blockMinutes === null || blockMinutes === 0) {
-    const summed = picMinutes + sicMinutes + dualMinutes + (instructional ?? 0);
+    const summed = picMinutesLegacy + sicMinutesLegacy + (instructional ?? 0);
     blockMinutes = summed > 0 ? summed : null;
   }
 
-  const instrumentMinutes = (ifrSimulated || 0) + (ifrActual || 0);
+  const roleTimes = deriveRoleTimeMinutes(blockMinutes, operatingCapacity);
+
+  const sicTimeMinutes =
+    dualBreakdownTotal > 0
+      ? dualBreakdownTotal
+      : operatingCapacity === 'dual' || ['copilot', 'observer', 'relief'].includes(operatingCapacity)
+        ? (roleTimes.sic_time_minutes ?? (sicMinutesLegacy > 0 ? sicMinutesLegacy : null))
+        : sicMinutesLegacy > 0
+          ? sicMinutesLegacy
+          : null;
+
+  const picTimeMinutes =
+    picBreakdownTotal > 0
+      ? picBreakdownTotal
+      : ['pic', 'solo', 'p1u_s', 'examiner', 'instructor'].includes(operatingCapacity)
+        ? (roleTimes.pic_time_minutes ?? (picMinutesLegacy > 0 ? picMinutesLegacy : null))
+        : picMinutesLegacy > 0
+          ? picMinutesLegacy
+          : null;
+
+  const nightMinutes =
+    picBreakdown.nightCategory ||
+    picBreakdown.cctsNight ||
+    picBreakdown.gftNight ||
+    picBreakdown.multiNight ||
+    dualBreakdown.night;
+
+  const instrumentMinutes =
+    operatingCapacity === 'dual'
+      ? dualBreakdown.instrument
+      : picBreakdown.multiIrt || (ifrActual || 0) + (ifrSimulated || 0);
+
+  const instrumentForDb = instrumentMinutes && instrumentMinutes > 0 ? instrumentMinutes : null;
 
   return {
     payload: {
@@ -441,19 +600,27 @@ export function mapCsvRowToFlight(userId: string, row: CsvFlightRow): { payload:
       out_time: outTime,
       in_time: inTime,
       block_time_minutes: blockMinutes,
-      pic_time_minutes: picMinutes || null,
-      sic_time_minutes: sicMinutes + dualMinutes > 0 ? sicMinutes + dualMinutes : null,
-      night_time_minutes: nightMinutes || null,
-      instrument_time_minutes: instrumentMinutes || null,
-      ifr_actual_minutes: ifrActual,
-      ifr_simulated_minutes: ifrSimulated,
-      instrument_timings_minutes: instrumentMinutes || null,
-      cross_country_total_minutes: crossCountry,
-      is_cross_country: (crossCountry ?? 0) > 0,
+      total_time_minutes: blockMinutes,
+      pic_time_minutes: picTimeMinutes,
+      sic_time_minutes: sicTimeMinutes,
+      night_time_minutes: nightMinutes,
+      instrument_time_minutes: instrumentForDb,
+      ifr_actual_minutes: operatingCapacity === 'dual' ? null : ifrActual,
+      ifr_simulated_minutes: operatingCapacity === 'dual' ? null : ifrSimulated,
+      instrument_timings_minutes: instrumentForDb,
+      cross_country_total_minutes: crossCountryTotal,
+      is_cross_country:
+        (crossCountryTotal || 0) > 0 ||
+        (picBreakdown.xcty || 0) > 0,
       pic_name: row['Pilot-in-Command']?.trim() || null,
       co_pilot_name: row['Co. pilot or student']?.trim() || null,
-      operating_capacity: inferOperatingCapacity(row),
+      operating_capacity: operatingCapacity || null,
       remarks: buildRemarks(row),
+      dual_extra_minutes: dualBreakdown.extra,
+      dual_night_minutes: dualBreakdown.night,
+      dual_if_minutes: dualBreakdown.instrument,
+      dual_multi_minutes: dualBreakdown.multi,
+      ...picBreakdownToDbPayload(picBreakdown),
     },
   };
 }

@@ -247,8 +247,9 @@ export default function ImportFlightsScreen() {
         <View className="mb-4 rounded-xl border border-slate-800 bg-slate-900 p-3">
           <Text className="mb-2 text-sm font-semibold text-slate-200">Expected columns</Text>
           <Text className="text-xs leading-5 text-slate-500">
-            Required: {REQUIRED_CSV_HEADERS.join(', ')}. Duplicates are skipped when the same{' '}
-            <Text className="text-slate-300">Date of Flight</Text> and{' '}
+            Required: {REQUIRED_CSV_HEADERS.join(', ')}. PIC / Dual / IF columns map into career
+            breakdown fields (CCTS, XCTY, GFT, multi checks, dual IF/night/multi). Duplicates are
+            skipped when the same <Text className="text-slate-300">Date of Flight</Text> and{' '}
             <Text className="text-slate-300">Flight Departure Time</Text> already exist.
           </Text>
         </View>
