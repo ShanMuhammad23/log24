@@ -11,11 +11,48 @@ import {
   fetchCareerTotals,
   FlightTotalsRow,
   formatCareerHours,
+  HOUR_SUMMARY_TARGETS,
 } from '@/utils/career';
 
 function percentFromMinutes(current: number, target: number) {
   if (target <= 0) return 0;
   return Math.max(0, Math.min(100, Math.round((current / target) * 100)));
+}
+
+function ColumnSummaryHeader({
+  title,
+  currentMinutes,
+  targetMinutes,
+  accentColor,
+}: {
+  title: string;
+  currentMinutes: number;
+  targetMinutes: number;
+  accentColor: string;
+}) {
+  const progress = percentFromMinutes(currentMinutes, targetMinutes);
+
+  return (
+    <View className="mb-3 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+      <Text className="text-center text-sm font-bold uppercase tracking-wide text-slate-700 dark:text-slate-200">
+        {title}
+      </Text>
+      <View className="mt-2 flex-row items-end justify-center">
+        <Text className="text-3xl font-bold text-slate-900 dark:text-slate-100">
+          {formatCareerHours(currentMinutes)}
+        </Text>
+        <Text className="mb-0.5 ml-1.5 text-base font-medium text-slate-500 dark:text-slate-400">
+          / {formatCareerHours(targetMinutes)} Hr
+        </Text>
+      </View>
+      <View className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+        <View className="h-full rounded-full" style={{ width: `${progress}%`, backgroundColor: accentColor }} />
+      </View>
+      <Text className="mt-1.5 text-center text-xs font-semibold" style={{ color: accentColor }}>
+        {progress}%
+      </Text>
+    </View>
+  );
 }
 
 function RequirementCard({
@@ -25,6 +62,7 @@ function RequirementCard({
   targetMinutes,
   accentColor,
   icon,
+  fullWidth,
 }: {
   title: string;
   minimumLabel: string;
@@ -32,12 +70,16 @@ function RequirementCard({
   targetMinutes?: number;
   accentColor: string;
   icon: React.ComponentProps<typeof FontAwesome>['name'];
+  fullWidth?: boolean;
 }) {
   const hasTarget = targetMinutes != null && targetMinutes > 0;
   const progress = hasTarget ? percentFromMinutes(currentMinutes, targetMinutes) : 0;
 
   return (
-    <View className="mb-3 w-[48.5%] rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+    <View
+      className={`mb-2 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900 ${
+        fullWidth ? 'w-full' : 'mb-3 w-[48.5%]'
+      }`}>
       <View className="flex-row items-start gap-2">
         <View className="h-11 w-11 items-center justify-center rounded-full" style={{ backgroundColor: `${accentColor}20` }}>
           <FontAwesome name={icon} size={20} color={accentColor} />
@@ -186,53 +228,107 @@ export default function CareerScreen() {
                 </Pressable>
               </View>
 
-              <View className="mb-1 flex-row flex-wrap justify-between">
-                <RequirementCard
-                  title="Solo PIC"
-                  minimumLabel="Logged solo PIC"
-                  currentMinutes={summary.soloPic}
-                  accentColor="#2563eb"
-                  icon="user"
-                />
-                <RequirementCard
-                  title="Cross Country"
-                  minimumLabel="Minimum 50 hrs"
-                  currentMinutes={summary.crossCountry}
-                  targetMinutes={CAREER_TARGETS.crossCountry}
-                  accentColor="#14b8a6"
-                  icon="location-arrow"
-                />
-                <RequirementCard
-                  title="Instrument Flying"
-                  minimumLabel="Minimum 20 hrs"
-                  currentMinutes={summary.instrumentBreakdown.total}
-                  targetMinutes={CAREER_TARGETS.instrument}
-                  accentColor="#ea580c"
-                  icon="dot-circle-o"
-                />
-                <RequirementCard
-                  title="Dual"
-                  minimumLabel="No fixed limit"
-                  currentMinutes={summary.dual}
-                  accentColor="#7c3aed"
-                  icon="users"
-                />
-                <RequirementCard
-                  title="General Flying"
-                  minimumLabel="PIC / instructor time"
-                  currentMinutes={summary.generalFlying}
-                  accentColor="#ca8a04"
-                  icon="fighter-jet"
-                />
-                <RequirementCard
-                  title="PIC"
-                  minimumLabel="Minimum 100 hrs"
-                  currentMinutes={summary.pic.total}
-                  targetMinutes={CAREER_TARGETS.pic}
-                  accentColor="#0d9488"
-                  icon="plane"
-                />
+              <View className="mb-3 flex-row items-start gap-2">
+                <View className="flex-1">
+                  <ColumnSummaryHeader
+                    title="Solo PIC"
+                    currentMinutes={summary.hourSummary.soloPic.total}
+                    targetMinutes={HOUR_SUMMARY_TARGETS.soloPic}
+                    accentColor="#2563eb"
+                  />
+                  <RequirementCard
+                    fullWidth
+                    title="Cross Country"
+                    minimumLabel=""
+                    currentMinutes={summary.hourSummary.soloPic.crossCountry}
+                    targetMinutes={HOUR_SUMMARY_TARGETS.soloCrossCountry}
+                    accentColor="#14b8a6"
+                    icon="location-arrow"
+                  />
+                  <RequirementCard
+                    fullWidth
+                    title="CCTS"
+                    minimumLabel=""
+                    currentMinutes={summary.hourSummary.soloPic.ccts}
+                    targetMinutes={HOUR_SUMMARY_TARGETS.ccts}
+                    accentColor="#2563eb"
+                    icon="graduation-cap"
+                  />
+                  <RequirementCard
+                    fullWidth
+                    title="GFT"
+                    minimumLabel=""
+                    currentMinutes={summary.hourSummary.soloPic.gft}
+                    targetMinutes={HOUR_SUMMARY_TARGETS.gft}
+                    accentColor="#0d9488"
+                    icon="check-circle"
+                  />
+                  <RequirementCard
+                    fullWidth
+                    title="Multi Checks"
+                    minimumLabel=""
+                    currentMinutes={summary.hourSummary.soloPic.multiChecks}
+                    targetMinutes={HOUR_SUMMARY_TARGETS.multiChecks}
+                    accentColor="#ca8a04"
+                    icon="list-alt"
+                  />
+                  <RequirementCard
+                    fullWidth
+                    title="Night"
+                    minimumLabel=""
+                    currentMinutes={summary.hourSummary.soloPic.night}
+                    targetMinutes={HOUR_SUMMARY_TARGETS.night}
+                    accentColor="#6366f1"
+                    icon="moon-o"
+                  />
+                </View>
+
+                <View className="flex-1">
+                  <ColumnSummaryHeader
+                    title="Dual"
+                    currentMinutes={summary.hourSummary.dual.total}
+                    targetMinutes={HOUR_SUMMARY_TARGETS.dual}
+                    accentColor="#7c3aed"
+                  />
+                  <RequirementCard
+                    fullWidth
+                    title="IF"
+                    minimumLabel="/ 20 Hr"
+                    currentMinutes={summary.hourSummary.dual.instrument}
+                    targetMinutes={HOUR_SUMMARY_TARGETS.dualIf}
+                    accentColor="#ea580c"
+                    icon="dot-circle-o"
+                  />
+                  <RequirementCard
+                    fullWidth
+                    title="Multi"
+                    minimumLabel=""
+                    currentMinutes={summary.hourSummary.dual.multi}
+                    targetMinutes={HOUR_SUMMARY_TARGETS.dualMulti}
+                    accentColor="#7c3aed"
+                    icon="plane"
+                  />
+                  <RequirementCard
+                    fullWidth
+                    title="Night"
+                    minimumLabel=""
+                    currentMinutes={summary.hourSummary.dual.night}
+                    targetMinutes={HOUR_SUMMARY_TARGETS.dualNight}
+                    accentColor="#6366f1"
+                    icon="moon-o"
+                  />
+                  <RequirementCard
+                    fullWidth
+                    title="Extra / Other"
+                    minimumLabel="Not fixed"
+                    currentMinutes={summary.hourSummary.dual.extra}
+                    accentColor="#64748b"
+                    icon="ellipsis-h"
+                  />
+                </View>
               </View>
+
+              <Text className="mb-3 mt-1 text-xl font-semibold text-slate-900 dark:text-slate-100">Flight Breakdown</Text>
 
               <DetailRequirementCard
                 title="Checks"
@@ -246,6 +342,28 @@ export default function CareerScreen() {
                 <DetailRow label="Night" minutes={summary.checks.night} />
                 <DetailRow label="IRT" minutes={summary.checks.irt} />
                 <DetailRow label="Night PIC" minutes={summary.checks.nightPic} />
+              </DetailRequirementCard>
+
+              <DetailRequirementCard
+                title="PIC Logbook Breakdown"
+                subtitle="CCTS, XCTY, GFT checks, multi checks"
+                icon="user"
+                accentColor="#0d9488"
+              >
+                <DetailRow label="CCTS Day" minutes={summary.pic.breakdown.cctsDay} />
+                <DetailRow label="CCTS Night" minutes={summary.pic.breakdown.cctsNight} />
+                <DetailRow label="XCTY" minutes={summary.pic.breakdown.xcty} />
+                <DetailRow label="Night" minutes={summary.pic.breakdown.night} />
+                <Text className="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-200">GFT Checks</Text>
+                <DetailRow label="300 NM (GFT)" minutes={summary.pic.breakdown.gft300nm} />
+                <DetailRow label="250 NM" minutes={summary.pic.breakdown.gft250nm} />
+                <DetailRow label="120 NM" minutes={summary.pic.breakdown.gft120nm} />
+                <DetailRow label="Day" minutes={summary.pic.breakdown.gftDay} />
+                <DetailRow label="Night" minutes={summary.pic.breakdown.gftNight} />
+                <Text className="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-200">Multi Checks</Text>
+                <DetailRow label="Day" minutes={summary.pic.breakdown.multiDay} />
+                <DetailRow label="Night" minutes={summary.pic.breakdown.multiNight} />
+                <DetailRow label="IRT" minutes={summary.pic.breakdown.multiIrt} />
               </DetailRequirementCard>
 
               <DetailRequirementCard
@@ -274,50 +392,19 @@ export default function CareerScreen() {
                 <DetailRow label="Dual" minutes={summary.instrumentBreakdown.ifDual} />
               </DetailRequirementCard>
 
-              <View className="mb-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-                <View className="flex-row items-center justify-between">
-                  <View className="flex-row items-center gap-3">
-                    <View className="h-10 w-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-950/60">
-                      <FontAwesome name="plane" size={18} color="#2563eb" />
-                    </View>
-                    <View>
-                      <Text className="text-lg font-semibold text-slate-900 dark:text-slate-100">CPL Total (All Requirements)</Text>
-                      <Text className="text-sm text-slate-500 dark:text-slate-400">Minimum 200 hrs</Text>
-                    </View>
-                  </View>
-                  <View className="rounded-lg bg-slate-100 px-3 py-1 dark:bg-slate-800">
-                    <Text className="text-base font-semibold text-blue-700 dark:text-blue-300">{totals.progress}%</Text>
-                  </View>
-                </View>
-                <View className="mt-2 flex-row items-end justify-center">
-                  <Text className="text-3xl font-bold text-blue-700 dark:text-blue-300">{formatCareerHours(totals.total)}</Text>
-                  <Text className="mb-0.5 ml-2 text-base font-medium text-slate-500 dark:text-slate-400">
-                    / {formatCareerHours(CAREER_TARGETS.total)}
-                  </Text>
-                </View>
-                <View className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-                  <View className="h-full rounded-full bg-blue-500" style={{ width: `${totals.progress}%` }} />
-                </View>
-              </View>
+              <DetailRequirementCard
+                title="Dual Breakdown"
+                subtitle={`Total ${formatCareerHours(summary.dualBreakdown.total)} — extra, night, IF, multi`}
+                icon="users"
+                accentColor="#7c3aed"
+              >
+                <DetailRow label="Extra / Other" minutes={summary.dualBreakdown.extra} />
+                <DetailRow label="Night" minutes={summary.dualBreakdown.night} />
+                <DetailRow label="IF" minutes={summary.dualBreakdown.instrument} />
+                <DetailRow label="Multi" minutes={summary.dualBreakdown.multi} />
+              </DetailRequirementCard>
 
-              <View className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-                <View className="flex-row items-center justify-between">
-                  <View className="flex-row items-center gap-3">
-                    <View className="h-10 w-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-950/60">
-                      <FontAwesome name="calendar" size={18} color="#2563eb" />
-                    </View>
-                    <View className="flex-1 pr-2">
-                      <Text className="text-xl font-semibold text-slate-900 dark:text-slate-100">Buffer Time Left</Text>
-                      <Text className="text-sm text-slate-600 dark:text-slate-400">
-                        You have approximately 11 Months 14 Days left to complete CPL.
-                      </Text>
-                    </View>
-                  </View>
-                  <Pressable className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 dark:border-slate-700 dark:bg-slate-800">
-                    <Text className="font-medium text-blue-700 dark:text-blue-300">View Projection</Text>
-                  </Pressable>
-                </View>
-              </View>
+            
             </>
           )}
         </ScrollView>

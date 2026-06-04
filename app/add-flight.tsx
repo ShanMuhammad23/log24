@@ -15,18 +15,21 @@ import { useSupabaseSession } from '@/utils/auth';
 import {
   blockMinutesFromOutIn,
   buildFlightSavePayload,
+  dualBreakdownExceedsBlockTime,
+  dualBreakdownSumExceedsBlockTime,
   fetchLastFlightDefaults,
   formatDateISO,
   formatDuration,
   formatTimeFromDb,
   isCompleteTimeEntry,
   minutesToHHMM,
-  nightExceedsBlockTime,
+  parseDualBreakdownMinutes,
   toMinutes,
   type FlightSaveInput,
 } from '@/utils/flight-form';
 import { BottomSheetModal } from '@/components/BottomSheetModal';
 import { AirportSearchField } from '@/components/flight-form/AirportSearchField';
+import { PicBreakdownSection } from '@/components/flight-form/PicBreakdownSection';
 import { SearchablePresetField } from '@/components/flight-form/SearchablePresetField';
 import {
   addUserSavedAirport,
@@ -45,6 +48,12 @@ import {
   type FlightFieldType,
 } from '@/utils/flight-field-presets';
 import { DEFAULT_CAPACITY_OPTIONS, getProfile } from '@/utils/profile';
+import {
+  EMPTY_PIC_BREAKDOWN,
+  picBreakdownFormFromRow,
+  validatePicBreakdown,
+  type PicBreakdownFormState,
+} from '@/utils/pic-breakdown';
 import { supabase } from '@/utils/supabase';
 
 type FlightFormRow = {
@@ -73,11 +82,22 @@ type FlightFormRow = {
   takeoffs: number | null;
   landings: number | null;
   go_arounds: number | null;
-  is_cross_country: boolean;
-  pf_takeoff_landing: boolean;
-  stl: boolean;
-  multi_crew: boolean;
-  ulr_ops: boolean;
+  dual_extra_minutes: number | null;
+  dual_night_minutes: number | null;
+  dual_if_minutes: number | null;
+  dual_multi_minutes: number | null;
+  pic_ccts_day_minutes: number | null;
+  pic_ccts_night_minutes: number | null;
+  pic_xcty_minutes: number | null;
+  pic_night_category_minutes: number | null;
+  pic_gft_300nm_minutes: number | null;
+  pic_gft_250nm_minutes: number | null;
+  pic_gft_120nm_minutes: number | null;
+  pic_gft_day_minutes: number | null;
+  pic_gft_night_minutes: number | null;
+  pic_multi_day_minutes: number | null;
+  pic_multi_night_minutes: number | null;
+  pic_multi_irt_minutes: number | null;
 };
 
 function FieldRow({
@@ -96,6 +116,77 @@ function FieldRow({
         {required ? <Text className="text-base font-bold text-red-600 dark:text-red-500"> *</Text> : null}
       </Text>
       <View className="flex-1">{children}</View>
+    </View>
+  );
+}
+
+function DualCategoryRow({
+  label,
+  enabled,
+  onEnabledChange,
+  time,
+  onTimeChange,
+  blockMinutes,
+}: {
+  label: string;
+  enabled: boolean;
+  onEnabledChange: (value: boolean) => void;
+  time: string;
+  onTimeChange: (value: string) => void;
+  blockMinutes: number | null;
+}) {
+  const exceedsBlock =
+    enabled &&
+    blockMinutes !== null &&
+    blockMinutes > 0 &&
+    (() => {
+      const minutes = toMinutes(time);
+      return minutes !== null && minutes > blockMinutes;
+    })();
+
+  return (
+    <View className="mb-3 last:mb-0">
+      <View className="flex-row items-center justify-between">
+        <Text className="text-sm font-medium text-slate-700 dark:text-slate-200">{label}</Text>
+        <Switch
+          value={enabled}
+          onValueChange={onEnabledChange}
+          trackColor={{ false: '#475569', true: '#2563eb' }}
+        />
+      </View>
+      {enabled ? (
+        <View className="mt-2">
+          <TextField value={time} onChangeText={onTimeChange} placeholder="HH:MM" keyboardType="numeric" />
+          {blockMinutes !== null && blockMinutes > 0 ? (
+            <Text className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Max {formatDuration(blockMinutes)} (block time)
+            </Text>
+          ) : null}
+          {exceedsBlock ? (
+            <Text className="mt-1 text-xs text-red-400">Cannot exceed block time.</Text>
+          ) : null}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function RoleHoursContainer({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <View className="mb-4 rounded-xl border border-slate-300 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900">
+      <Text className="text-sm font-bold uppercase tracking-wide text-slate-700 dark:text-slate-200">{title}</Text>
+      {subtitle ? (
+        <Text className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{subtitle}</Text>
+      ) : null}
+      <View className="mt-3">{children}</View>
     </View>
   );
 }
@@ -142,15 +233,20 @@ export default function AddFlightScreen() {
   const [to, setTo] = useState('');
   const [picName, setPicName] = useState('');
   const [coPilotName, setCoPilotName] = useState('');
-  const [night, setNight] = useState('');
-  const [ifrActual, setIfrActual] = useState('');
   const [crossCountryTotal, setCrossCountryTotal] = useState('');
   const [routePoints, setRoutePoints] = useState('');
   const [distance, setDistance] = useState('');
   const [remarks, setRemarks] = useState('');
   const [signature, setSignature] = useState('');
-  const [instrumentTimings, setInstrumentTimings] = useState('');
-  const [ifrSimulated, setIfrSimulated] = useState('');
+  const [dualExtraEnabled, setDualExtraEnabled] = useState(false);
+  const [dualExtraTime, setDualExtraTime] = useState('');
+  const [dualNightEnabled, setDualNightEnabled] = useState(false);
+  const [dualNightTime, setDualNightTime] = useState('');
+  const [dualIfEnabled, setDualIfEnabled] = useState(false);
+  const [dualIfTime, setDualIfTime] = useState('');
+  const [dualMultiEnabled, setDualMultiEnabled] = useState(false);
+  const [dualMultiTime, setDualMultiTime] = useState('');
+  const [picBreakdown, setPicBreakdown] = useState<PicBreakdownFormState>(EMPTY_PIC_BREAKDOWN);
   const [operatingCapacity, setOperatingCapacity] = useState<string | null>(null);
   const [capacityOpen, setCapacityOpen] = useState(false);
   const [outTime, setOutTime] = useState('');
@@ -158,11 +254,6 @@ export default function AddFlightScreen() {
   const [takeoffs, setTakeoffs] = useState('');
   const [landings, setLandings] = useState('');
   const [goArounds, setGoArounds] = useState('');
-  const [isCrossCountry, setIsCrossCountry] = useState(false);
-  const [pfTakeoffLanding, setPfTakeoffLanding] = useState(false);
-  const [stl, setStl] = useState(false);
-  const [multiCrew, setMultiCrew] = useState(false);
-  const [ulrOps, setUlrOps] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -173,27 +264,46 @@ export default function AddFlightScreen() {
 
   const blockMinutes = useMemo(() => blockMinutesFromOutIn(outTime, inTime), [outTime, inTime]);
 
+  const showPicBreakdown = operatingCapacity === 'pic';
+  const showDualBreakdown = operatingCapacity === 'dual';
+
   const totalTime = useMemo(() => {
     if (blockMinutes === null) return '--:--';
     return formatDuration(blockMinutes);
   }, [blockMinutes]);
 
-  const nightExceedsBlock = useMemo(
-    () => night.trim().length > 0 && nightExceedsBlockTime(night, outTime, inTime),
-    [night, outTime, inTime]
-  );
-
-  // When Out/In block time shrinks, cap night time to the new block maximum.
+  // When Out/In block time shrinks, cap enabled dual child durations to the new block maximum.
   useEffect(() => {
     if (blockMinutes === null) return;
-    setNight((current) => {
+
+    const capTime = (current: string) => {
       if (!current.trim()) return current;
-      const nightMinutes = toMinutes(current);
-      if (nightMinutes !== null && nightMinutes > blockMinutes) {
+      const minutes = toMinutes(current);
+      if (minutes !== null && minutes > blockMinutes) {
         return minutesToHHMM(blockMinutes);
       }
       return current;
-    });
+    };
+
+    setDualExtraTime((current) => capTime(current));
+    setDualNightTime((current) => capTime(current));
+    setDualIfTime((current) => capTime(current));
+    setDualMultiTime((current) => capTime(current));
+
+    setPicBreakdown((current) => ({
+      ...current,
+      cctsTime: capTime(current.cctsTime),
+      xctyTime: capTime(current.xctyTime),
+      nightCategoryTime: capTime(current.nightCategoryTime),
+      gft300nmTime: capTime(current.gft300nmTime),
+      gft250nmTime: capTime(current.gft250nmTime),
+      gft120nmTime: capTime(current.gft120nmTime),
+      gftDayTime: capTime(current.gftDayTime),
+      gftNightTime: capTime(current.gftNightTime),
+      multiDayTime: capTime(current.multiDayTime),
+      multiNightTime: capTime(current.multiNightTime),
+      multiIrtTime: capTime(current.multiIrtTime),
+    }));
   }, [blockMinutes]);
 
   const formInput = useMemo<FlightSaveInput>(
@@ -209,11 +319,7 @@ export default function AddFlightScreen() {
       inTime,
       picName,
       coPilotName,
-      night,
-      ifrActual,
       crossCountryTotal,
-      instrumentTimings,
-      ifrSimulated,
       routePoints,
       distance,
       remarks,
@@ -221,11 +327,15 @@ export default function AddFlightScreen() {
       takeoffs,
       landings,
       goArounds,
-      isCrossCountry,
-      pfTakeoffLanding,
-      stl,
-      multiCrew,
-      ulrOps,
+      dualExtraEnabled,
+      dualExtraTime,
+      dualNightEnabled,
+      dualNightTime,
+      dualIfEnabled,
+      dualIfTime,
+      dualMultiEnabled,
+      dualMultiTime,
+      picBreakdown,
     }),
     [
       date,
@@ -239,11 +349,7 @@ export default function AddFlightScreen() {
       inTime,
       picName,
       coPilotName,
-      night,
-      ifrActual,
       crossCountryTotal,
-      instrumentTimings,
-      ifrSimulated,
       routePoints,
       distance,
       remarks,
@@ -251,11 +357,15 @@ export default function AddFlightScreen() {
       takeoffs,
       landings,
       goArounds,
-      isCrossCountry,
-      pfTakeoffLanding,
-      stl,
-      multiCrew,
-      ulrOps,
+      dualExtraEnabled,
+      dualExtraTime,
+      dualNightEnabled,
+      dualNightTime,
+      dualIfEnabled,
+      dualIfTime,
+      dualMultiEnabled,
+      dualMultiTime,
+      picBreakdown,
     ]
   );
 
@@ -313,7 +423,7 @@ export default function AddFlightScreen() {
         const { data, error: loadError } = await supabase
           .from('flights')
           .select(
-            'flight_date, flight_number, aircraft_type, aircraft_registration, origin_iata, destination_iata, block_time_minutes, night_time_minutes, instrument_time_minutes, instrument_timings_minutes, ifr_actual_minutes, ifr_simulated_minutes, cross_country_total_minutes, operating_capacity, pic_name, co_pilot_name, out_time, in_time, route_points, distance_nm, remarks, signature_url, takeoffs, landings, go_arounds, is_cross_country, pf_takeoff_landing, stl, multi_crew, ulr_ops'
+            'flight_date, flight_number, aircraft_type, aircraft_registration, origin_iata, destination_iata, block_time_minutes, night_time_minutes, instrument_time_minutes, instrument_timings_minutes, ifr_actual_minutes, ifr_simulated_minutes, cross_country_total_minutes, operating_capacity, pic_name, co_pilot_name, out_time, in_time, route_points, distance_nm, remarks, signature_url, takeoffs, landings, go_arounds, dual_extra_minutes, dual_night_minutes, dual_if_minutes, dual_multi_minutes, pic_ccts_day_minutes, pic_ccts_night_minutes, pic_xcty_minutes, pic_night_category_minutes, pic_gft_300nm_minutes, pic_gft_250nm_minutes, pic_gft_120nm_minutes, pic_gft_day_minutes, pic_gft_night_minutes, pic_multi_day_minutes, pic_multi_night_minutes, pic_multi_irt_minutes'
           )
           .eq('id', editFlightId)
           .eq('user_id', userId)
@@ -337,11 +447,7 @@ export default function AddFlightScreen() {
         setCoPilotName(data.co_pilot_name || '');
         setOutTime(formatTimeFromDb(data.out_time));
         setInTime(formatTimeFromDb(data.in_time));
-        setNight(minutesToHHMM(data.night_time_minutes));
-        setIfrActual(minutesToHHMM(data.ifr_actual_minutes));
         setCrossCountryTotal(minutesToHHMM(data.cross_country_total_minutes));
-        setInstrumentTimings(minutesToHHMM(data.instrument_timings_minutes ?? data.instrument_time_minutes));
-        setIfrSimulated(minutesToHHMM(data.ifr_simulated_minutes));
         setRoutePoints(data.route_points || '');
         setDistance(data.distance_nm != null ? String(data.distance_nm) : '');
         setRemarks(data.remarks || '');
@@ -350,11 +456,42 @@ export default function AddFlightScreen() {
         setLandings(String(data.landings ?? 1));
         setGoArounds(String(data.go_arounds ?? 0));
         setOperatingCapacity(data.operating_capacity);
-        setIsCrossCountry(data.is_cross_country);
-        setPfTakeoffLanding(data.pf_takeoff_landing);
-        setStl(data.stl);
-        setMultiCrew(data.multi_crew);
-        setUlrOps(data.ulr_ops);
+
+        const loadDualField = (
+          minutes: number | null | undefined,
+          setEnabled: (value: boolean) => void,
+          setTime: (value: string) => void
+        ) => {
+          if ((minutes || 0) > 0) {
+            setEnabled(true);
+            setTime(minutesToHHMM(minutes));
+            return;
+          }
+          setEnabled(false);
+          setTime('');
+        };
+
+        loadDualField(data.dual_extra_minutes, setDualExtraEnabled, setDualExtraTime);
+        loadDualField(data.dual_night_minutes, setDualNightEnabled, setDualNightTime);
+        loadDualField(data.dual_if_minutes, setDualIfEnabled, setDualIfTime);
+        loadDualField(data.dual_multi_minutes, setDualMultiEnabled, setDualMultiTime);
+        setPicBreakdown(picBreakdownFormFromRow(data));
+
+        // Legacy rows saved before dual breakdown columns existed.
+        if (
+          !data.dual_extra_minutes &&
+          !data.dual_night_minutes &&
+          !data.dual_if_minutes &&
+          !data.dual_multi_minutes
+        ) {
+          loadDualField(data.night_time_minutes, setDualNightEnabled, setDualNightTime);
+          loadDualField(
+            data.ifr_actual_minutes ?? data.instrument_timings_minutes ?? data.instrument_time_minutes,
+            setDualIfEnabled,
+            setDualIfTime
+          );
+        }
+
         setLoadingFlight(false);
       };
 
@@ -418,14 +555,53 @@ export default function AddFlightScreen() {
       return;
     }
 
-    if (night.trim()) {
+    const enabledDualFields = [
+      dualExtraEnabled,
+      dualNightEnabled,
+      dualIfEnabled,
+      dualMultiEnabled,
+    ].filter(Boolean);
+
+    if (enabledDualFields.length > 0) {
       const block = blockMinutesFromOutIn(outTime, inTime);
       if (block === null) {
-        setError('Enter Out and In time before logging Night time.');
+        setError('Enter Out and In time before logging dual breakdown hours.');
         return;
       }
-      if (nightExceedsBlockTime(night, outTime, inTime)) {
-        setError('Night time cannot exceed total block time (Out–In).');
+
+      const breakdown = parseDualBreakdownMinutes(formInput);
+      if (dualExtraEnabled && breakdown.extra === null) {
+        setError('Enter a duration for Extra / Other.');
+        return;
+      }
+      if (dualNightEnabled && breakdown.night === null) {
+        setError('Enter a duration for Night.');
+        return;
+      }
+      if (dualIfEnabled && breakdown.instrument === null) {
+        setError('Enter a duration for IF.');
+        return;
+      }
+      if (dualMultiEnabled && breakdown.multi === null) {
+        setError('Enter a duration for Multi.');
+        return;
+      }
+
+      if (dualBreakdownExceedsBlockTime(formInput, outTime, inTime)) {
+        setError('Each dual category cannot exceed total block time (Out–In).');
+        return;
+      }
+
+      if (dualBreakdownSumExceedsBlockTime(formInput, outTime, inTime)) {
+        setError('Combined dual categories cannot exceed total block time (Out–In).');
+        return;
+      }
+    }
+
+    if (showPicBreakdown) {
+      const picError = validatePicBreakdown(picBreakdown, blockMinutesFromOutIn(outTime, inTime));
+      if (picError) {
+        setError(picError);
         return;
       }
     }
@@ -659,30 +835,8 @@ export default function AddFlightScreen() {
           ))}
         </View>
 
-        <FieldRow label="Night">
-          <View className="flex-1">
-            <TextField value={night} onChangeText={setNight} placeholder="HH:MM" keyboardType="numeric" />
-            {blockMinutes !== null && blockMinutes > 0 ? (
-              <Text className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                Max {formatDuration(blockMinutes)} (block time)
-              </Text>
-            ) : null}
-            {nightExceedsBlock ? (
-              <Text className="mt-1 text-xs text-red-400">Night time cannot exceed block time.</Text>
-            ) : null}
-          </View>
-        </FieldRow>
-        <FieldRow label="IFR Actual">
-          <TextField value={ifrActual} onChangeText={setIfrActual} placeholder="HH:MM" keyboardType="numeric" />
-        </FieldRow>
         <FieldRow label="X-C Total">
           <TextField value={crossCountryTotal} onChangeText={setCrossCountryTotal} placeholder="HH:MM" keyboardType="numeric" />
-        </FieldRow>
-        <FieldRow label="Instrument">
-          <TextField value={instrumentTimings} onChangeText={setInstrumentTimings} placeholder="HH:MM" keyboardType="numeric" />
-        </FieldRow>
-        <FieldRow label="IFR Sim">
-          <TextField value={ifrSimulated} onChangeText={setIfrSimulated} placeholder="HH:MM" keyboardType="numeric" />
         </FieldRow>
         <FieldRow label="Route">
           <TextField value={routePoints} onChangeText={setRoutePoints} placeholder="VOR / waypoints" />
@@ -694,24 +848,52 @@ export default function AddFlightScreen() {
           <TextField value={remarks} onChangeText={setRemarks} placeholder="Any notes" />
         </FieldRow>
 
-        <View className="mb-5 rounded-xl border border-slate-300 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900">
-          {[
-            ['Cross country flight', isCrossCountry, setIsCrossCountry],
-            ['PF (actual T/O + LDG)', pfTakeoffLanding, setPfTakeoffLanding],
-            ['STL (Co-pilot only)', stl, setStl],
-            ['Multi crew', multiCrew, setMultiCrew],
-            ['ULR ops', ulrOps, setUlrOps],
-          ].map(([label, value, setter]) => (
-            <View key={label as string} className="mb-2 flex-row items-center justify-between last:mb-0">
-              <Text className="text-sm font-medium text-slate-700 dark:text-slate-200">{label as string}</Text>
-              <Switch
-                value={value as boolean}
-                onValueChange={setter as (v: boolean) => void}
-                trackColor={{ false: '#475569', true: '#2563eb' }}
-              />
-            </View>
-          ))}
-        </View>
+        {showPicBreakdown ? (
+          <RoleHoursContainer title="PIC" subtitle="Log PIC hours by category">
+            <PicBreakdownSection
+              value={picBreakdown}
+              onChange={setPicBreakdown}
+              blockMinutes={blockMinutes}
+            />
+          </RoleHoursContainer>
+        ) : null}
+
+        {showDualBreakdown ? (
+          <RoleHoursContainer title="Dual" subtitle="Toggle categories and log time for each">
+            <DualCategoryRow
+              label="Extra / Other"
+              enabled={dualExtraEnabled}
+              onEnabledChange={setDualExtraEnabled}
+              time={dualExtraTime}
+              onTimeChange={setDualExtraTime}
+              blockMinutes={blockMinutes}
+            />
+            <DualCategoryRow
+              label="Night"
+              enabled={dualNightEnabled}
+              onEnabledChange={setDualNightEnabled}
+              time={dualNightTime}
+              onTimeChange={setDualNightTime}
+              blockMinutes={blockMinutes}
+            />
+            <DualCategoryRow
+              label="IF"
+              enabled={dualIfEnabled}
+              onEnabledChange={setDualIfEnabled}
+              time={dualIfTime}
+              onTimeChange={setDualIfTime}
+              blockMinutes={blockMinutes}
+            />
+            <DualCategoryRow
+              label="Multi"
+              enabled={dualMultiEnabled}
+              onEnabledChange={setDualMultiEnabled}
+              time={dualMultiTime}
+              onTimeChange={setDualMultiTime}
+              blockMinutes={blockMinutes}
+            />
+          </RoleHoursContainer>
+        ) : null}
 
         {error ? <Text className="mb-3 text-sm text-red-400">{error}</Text> : null}
         {success ? <Text className="mb-3 text-sm text-emerald-400">{success}</Text> : null}

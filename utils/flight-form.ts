@@ -1,4 +1,10 @@
 import { supabase } from '@/utils/supabase';
+import {
+  parsePicBreakdownMinutes,
+  picBreakdownToDbPayload,
+  sumPicBreakdownMinutes,
+  type PicBreakdownFormState,
+} from '@/utils/pic-breakdown';
 
 export type LastFlightDefaults = {
   flight_number: string | null;
@@ -26,11 +32,7 @@ export type FlightSaveInput = {
   inTime: string;
   picName: string;
   coPilotName: string;
-  night: string;
-  ifrActual: string;
   crossCountryTotal: string;
-  instrumentTimings: string;
-  ifrSimulated: string;
   routePoints: string;
   distance: string;
   remarks: string;
@@ -38,12 +40,58 @@ export type FlightSaveInput = {
   takeoffs: string;
   landings: string;
   goArounds: string;
-  isCrossCountry: boolean;
-  pfTakeoffLanding: boolean;
-  stl: boolean;
-  multiCrew: boolean;
-  ulrOps: boolean;
+  dualExtraEnabled: boolean;
+  dualExtraTime: string;
+  dualNightEnabled: boolean;
+  dualNightTime: string;
+  dualIfEnabled: boolean;
+  dualIfTime: string;
+  dualMultiEnabled: boolean;
+  dualMultiTime: string;
+  picBreakdown: PicBreakdownFormState;
 };
+
+export type DualBreakdownMinutes = {
+  extra: number | null;
+  night: number | null;
+  instrument: number | null;
+  multi: number | null;
+};
+
+export function parseDualBreakdownMinutes(input: FlightSaveInput): DualBreakdownMinutes {
+  return {
+    extra: input.dualExtraEnabled ? toMinutes(input.dualExtraTime) : null,
+    night: input.dualNightEnabled ? toMinutes(input.dualNightTime) : null,
+    instrument: input.dualIfEnabled ? toMinutes(input.dualIfTime) : null,
+    multi: input.dualMultiEnabled ? toMinutes(input.dualMultiTime) : null,
+  };
+}
+
+export function sumDualBreakdownMinutes(breakdown: DualBreakdownMinutes) {
+  return (
+    (breakdown.extra || 0) +
+    (breakdown.night || 0) +
+    (breakdown.instrument || 0) +
+    (breakdown.multi || 0)
+  );
+}
+
+/** True when any enabled dual child duration exceeds block time from Out/In. */
+export function dualBreakdownExceedsBlockTime(input: FlightSaveInput, outTime: string, inTime: string) {
+  const blockMinutes = blockMinutesFromOutIn(outTime, inTime);
+  if (blockMinutes === null) return false;
+  const breakdown = parseDualBreakdownMinutes(input);
+  return Object.values(breakdown).some((minutes) => minutes !== null && minutes > blockMinutes);
+}
+
+/** True when enabled dual children sum to more than block time. */
+export function dualBreakdownSumExceedsBlockTime(input: FlightSaveInput, outTime: string, inTime: string) {
+  const blockMinutes = blockMinutesFromOutIn(outTime, inTime);
+  if (blockMinutes === null) return false;
+  const breakdown = parseDualBreakdownMinutes(input);
+  const total = sumDualBreakdownMinutes(breakdown);
+  return total > blockMinutes;
+}
 
 export function formatDateISO(dateValue: Date) {
   const y = dateValue.getFullYear();
@@ -171,11 +219,39 @@ export function buildFlightSavePayload(input: FlightSaveInput): Record<string, u
   const blockMinutes = blockMinutesFromOutIn(input.outTime, input.inTime);
   const capacity = input.operatingCapacity.trim().toLowerCase();
   const roleTimes = deriveRoleTimeMinutes(blockMinutes, capacity);
-  const nightMinutes = toMinutes(input.night);
-  const instrumentTimingsMinutes = toMinutes(input.instrumentTimings);
-  const ifrActualMinutes = toMinutes(input.ifrActual);
-  const ifrSimulatedMinutes = toMinutes(input.ifrSimulated);
+  const dualBreakdown = parseDualBreakdownMinutes(input);
+  const dualBreakdownTotal = sumDualBreakdownMinutes(dualBreakdown);
+  const picBreakdown = parsePicBreakdownMinutes(input.picBreakdown);
+  const picBreakdownTotal = sumPicBreakdownMinutes(picBreakdown);
   const crossCountryMinutes = toMinutes(input.crossCountryTotal);
+
+  const sicTimeMinutes =
+    dualBreakdownTotal > 0
+      ? dualBreakdownTotal
+      : capacity === 'dual' || ['copilot', 'observer', 'relief'].includes(capacity)
+        ? roleTimes.sic_time_minutes
+        : null;
+
+  const picTimeMinutes =
+    picBreakdownTotal > 0
+      ? picBreakdownTotal
+      : capacity === 'pic' ||
+          capacity === 'solo' ||
+          capacity === 'p1u_s' ||
+          capacity === 'examiner' ||
+          capacity === 'instructor'
+        ? roleTimes.pic_time_minutes
+        : null;
+
+  const nightMinutes =
+    picBreakdown.nightCategory ||
+    picBreakdown.gftNight ||
+    picBreakdown.cctsNight ||
+    picBreakdown.multiNight ||
+    dualBreakdown.night;
+
+  const instrumentMinutes =
+    picBreakdown.multiIrt || dualBreakdown.instrument;
 
   return {
     flight_date: input.date.trim(),
@@ -187,14 +263,19 @@ export function buildFlightSavePayload(input: FlightSaveInput): Record<string, u
     block_time_minutes: blockMinutes,
     total_time_minutes: blockMinutes,
     night_time_minutes: nightMinutes,
-    instrument_time_minutes: instrumentTimingsMinutes,
-    instrument_timings_minutes: instrumentTimingsMinutes,
-    ifr_actual_minutes: ifrActualMinutes,
-    ifr_simulated_minutes: ifrSimulatedMinutes,
+    instrument_time_minutes: instrumentMinutes,
+    instrument_timings_minutes: instrumentMinutes,
+    ifr_actual_minutes: instrumentMinutes,
+    ifr_simulated_minutes: null,
     cross_country_total_minutes: crossCountryMinutes,
     operating_capacity: capacity || null,
-    pic_time_minutes: roleTimes.pic_time_minutes,
-    sic_time_minutes: roleTimes.sic_time_minutes,
+    pic_time_minutes: picTimeMinutes,
+    sic_time_minutes: sicTimeMinutes,
+    dual_extra_minutes: dualBreakdown.extra,
+    dual_night_minutes: dualBreakdown.night,
+    dual_if_minutes: dualBreakdown.instrument,
+    dual_multi_minutes: dualBreakdown.multi,
+    ...picBreakdownToDbPayload(picBreakdown),
     pic_name: input.picName.trim() || null,
     co_pilot_name: input.coPilotName.trim() || null,
     out_time: normalizeTimeForDb(input.outTime),
@@ -206,11 +287,14 @@ export function buildFlightSavePayload(input: FlightSaveInput): Record<string, u
     takeoffs: parseCount(input.takeoffs, 1),
     landings: parseCount(input.landings, 1),
     go_arounds: parseCount(input.goArounds, 0),
-    is_cross_country: input.isCrossCountry,
-    pf_takeoff_landing: input.pfTakeoffLanding,
-    stl: input.stl,
-    multi_crew: input.multiCrew,
-    ulr_ops: input.ulrOps,
+    is_cross_country:
+      (crossCountryMinutes || 0) > 0 ||
+      (picBreakdown.xcty || 0) > 0 ||
+      (picBreakdown.gft300nm || 0) > 0,
+    pf_takeoff_landing: false,
+    stl: false,
+    multi_crew: false,
+    ulr_ops: false,
   };
 }
 
