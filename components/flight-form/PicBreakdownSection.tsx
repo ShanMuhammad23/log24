@@ -1,6 +1,6 @@
 import { Pressable, Switch, Text, TextInput, View } from 'react-native';
 import { formatDuration, toMinutes } from '@/utils/flight-form';
-import type { PicBreakdownFormState, PicCctsPeriod } from '@/utils/pic-breakdown';
+import { countPicBreakdownSelections, type PicBreakdownFormState, type PicCctsPeriod } from '@/utils/pic-breakdown';
 
 function TimeInput({
   value,
@@ -67,7 +67,7 @@ function CategoryToggle({
           trackColor={{ false: '#475569', true: '#2563eb' }}
         />
       </View>
-      {enabled ? <View className="mt-2">{children}</View> : null}
+      {enabled && children ? <View className="mt-2">{children}</View> : null}
     </View>
   );
 }
@@ -80,6 +80,7 @@ function SubCategoryToggle({
   time,
   onTimeChange,
   blockMinutes,
+  showTimeInput,
 }: {
   label: string;
   hint?: string;
@@ -88,6 +89,7 @@ function SubCategoryToggle({
   time: string;
   onTimeChange: (value: string) => void;
   blockMinutes: number | null;
+  showTimeInput: boolean;
 }) {
   return (
     <View className="mb-3 ml-2 border-l-2 border-slate-200 pl-3 last:mb-0 dark:border-slate-700">
@@ -102,7 +104,9 @@ function SubCategoryToggle({
           trackColor={{ false: '#475569', true: '#2563eb' }}
         />
       </View>
-      {enabled ? <TimeInput value={time} onChangeText={onTimeChange} blockMinutes={blockMinutes} /> : null}
+      {enabled && showTimeInput ? (
+        <TimeInput value={time} onChangeText={onTimeChange} blockMinutes={blockMinutes} />
+      ) : null}
     </View>
   );
 }
@@ -142,13 +146,23 @@ type PicBreakdownSectionProps = {
 
 export function PicBreakdownSection({ value, onChange, blockMinutes }: PicBreakdownSectionProps) {
   const patch = (partial: Partial<PicBreakdownFormState>) => onChange({ ...value, ...partial });
+  const selectionCount = countPicBreakdownSelections(value);
+  const showTimeInputs = selectionCount >= 2;
 
   const setCctsPeriod = (period: PicCctsPeriod) => {
     patch({ cctsPeriod: period });
   };
 
+  const blockTimeHint =
+    selectionCount === 1 && blockMinutes !== null && blockMinutes > 0 ? (
+      <Text className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+        Block time ({formatDuration(blockMinutes)}) will apply to the selected category.
+      </Text>
+    ) : null;
+
   return (
     <View>
+      {blockTimeHint}
       <CategoryToggle
         label="CCTS (30 Hr)"
         enabled={value.cctsEnabled}
@@ -172,9 +186,11 @@ export function PicBreakdownSection({ value, onChange, blockMinutes }: PicBreakd
           />
         </View>
         {value.cctsPeriod ? (
-          <TimeInput value={value.cctsTime} onChangeText={(cctsTime) => patch({ cctsTime })} blockMinutes={blockMinutes} />
+          showTimeInputs ? (
+            <TimeInput value={value.cctsTime} onChangeText={(cctsTime) => patch({ cctsTime })} blockMinutes={blockMinutes} />
+          ) : null
         ) : (
-          <Text className="mt-2 text-xs text-slate-500 dark:text-slate-400">Select Day or Night, then enter hours.</Text>
+          <Text className="mt-2 text-xs text-slate-500 dark:text-slate-400">Select Day or Night.</Text>
         )}
       </CategoryToggle>
 
@@ -184,7 +200,9 @@ export function PicBreakdownSection({ value, onChange, blockMinutes }: PicBreakd
         onEnabledChange={(xctyEnabled) =>
           patch({ xctyEnabled, xctyTime: xctyEnabled ? value.xctyTime : '' })
         }>
-        <TimeInput value={value.xctyTime} onChangeText={(xctyTime) => patch({ xctyTime })} blockMinutes={blockMinutes} />
+        {showTimeInputs ? (
+          <TimeInput value={value.xctyTime} onChangeText={(xctyTime) => patch({ xctyTime })} blockMinutes={blockMinutes} />
+        ) : null}
       </CategoryToggle>
 
       <CategoryToggle
@@ -196,11 +214,13 @@ export function PicBreakdownSection({ value, onChange, blockMinutes }: PicBreakd
             nightCategoryTime: nightCategoryEnabled ? value.nightCategoryTime : '',
           })
         }>
-        <TimeInput
-          value={value.nightCategoryTime}
-          onChangeText={(nightCategoryTime) => patch({ nightCategoryTime })}
-          blockMinutes={blockMinutes}
-        />
+        {showTimeInputs ? (
+          <TimeInput
+            value={value.nightCategoryTime}
+            onChangeText={(nightCategoryTime) => patch({ nightCategoryTime })}
+            blockMinutes={blockMinutes}
+          />
+        ) : null}
       </CategoryToggle>
 
       <CategoryToggle
@@ -226,6 +246,7 @@ export function PicBreakdownSection({ value, onChange, blockMinutes }: PicBreakd
           time={value.gft300nmTime}
           onTimeChange={(gft300nmTime) => patch({ gft300nmTime })}
           blockMinutes={blockMinutes}
+          showTimeInput={showTimeInputs}
         />
         <SubCategoryToggle
           label="250 NM"
@@ -237,6 +258,7 @@ export function PicBreakdownSection({ value, onChange, blockMinutes }: PicBreakd
           time={value.gft250nmTime}
           onTimeChange={(gft250nmTime) => patch({ gft250nmTime })}
           blockMinutes={blockMinutes}
+          showTimeInput={showTimeInputs}
         />
         <SubCategoryToggle
           label="120 NM"
@@ -248,6 +270,7 @@ export function PicBreakdownSection({ value, onChange, blockMinutes }: PicBreakd
           time={value.gft120nmTime}
           onTimeChange={(gft120nmTime) => patch({ gft120nmTime })}
           blockMinutes={blockMinutes}
+          showTimeInput={showTimeInputs}
         />
         <SubCategoryToggle
           label="Day"
@@ -258,6 +281,7 @@ export function PicBreakdownSection({ value, onChange, blockMinutes }: PicBreakd
           time={value.gftDayTime}
           onTimeChange={(gftDayTime) => patch({ gftDayTime })}
           blockMinutes={blockMinutes}
+          showTimeInput={showTimeInputs}
         />
         <SubCategoryToggle
           label="Night"
@@ -268,6 +292,7 @@ export function PicBreakdownSection({ value, onChange, blockMinutes }: PicBreakd
           time={value.gftNightTime}
           onTimeChange={(gftNightTime) => patch({ gftNightTime })}
           blockMinutes={blockMinutes}
+          showTimeInput={showTimeInputs}
         />
       </CategoryToggle>
 
@@ -292,6 +317,7 @@ export function PicBreakdownSection({ value, onChange, blockMinutes }: PicBreakd
           time={value.multiDayTime}
           onTimeChange={(multiDayTime) => patch({ multiDayTime })}
           blockMinutes={blockMinutes}
+          showTimeInput={showTimeInputs}
         />
         <SubCategoryToggle
           label="Night"
@@ -303,6 +329,7 @@ export function PicBreakdownSection({ value, onChange, blockMinutes }: PicBreakd
           time={value.multiNightTime}
           onTimeChange={(multiNightTime) => patch({ multiNightTime })}
           blockMinutes={blockMinutes}
+          showTimeInput={showTimeInputs}
         />
         <SubCategoryToggle
           label="IRT"
@@ -314,6 +341,7 @@ export function PicBreakdownSection({ value, onChange, blockMinutes }: PicBreakd
           time={value.multiIrtTime}
           onTimeChange={(multiIrtTime) => patch({ multiIrtTime })}
           blockMinutes={blockMinutes}
+          showTimeInput={showTimeInputs}
         />
       </CategoryToggle>
     </View>

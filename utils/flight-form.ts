@@ -58,12 +58,64 @@ export type DualBreakdownMinutes = {
   multi: number | null;
 };
 
-export function parseDualBreakdownMinutes(input: FlightSaveInput): DualBreakdownMinutes {
+export function countDualBreakdownSelections(input: FlightSaveInput): number {
+  return [
+    input.dualExtraEnabled,
+    input.dualNightEnabled,
+    input.dualIfEnabled,
+    input.dualMultiEnabled,
+  ].filter(Boolean).length;
+}
+
+function resolveDualFieldMinutes(
+  enabled: boolean,
+  time: string,
+  autoFillFromBlock: boolean,
+  blockMinutes: number | null
+): number | null {
+  if (!enabled) return null;
+
+  const parsed = toMinutes(time);
+  if (parsed !== null && parsed > 0) return parsed;
+
+  if (autoFillFromBlock && blockMinutes !== null && blockMinutes > 0) {
+    return blockMinutes;
+  }
+
+  return null;
+}
+
+export function parseDualBreakdownMinutes(
+  input: FlightSaveInput,
+  blockMinutes: number | null = null
+): DualBreakdownMinutes {
+  const autoFillFromBlock = countDualBreakdownSelections(input) === 1;
+
   return {
-    extra: input.dualExtraEnabled ? toMinutes(input.dualExtraTime) : null,
-    night: input.dualNightEnabled ? toMinutes(input.dualNightTime) : null,
-    instrument: input.dualIfEnabled ? toMinutes(input.dualIfTime) : null,
-    multi: input.dualMultiEnabled ? toMinutes(input.dualMultiTime) : null,
+    extra: resolveDualFieldMinutes(
+      input.dualExtraEnabled,
+      input.dualExtraTime,
+      autoFillFromBlock,
+      blockMinutes
+    ),
+    night: resolveDualFieldMinutes(
+      input.dualNightEnabled,
+      input.dualNightTime,
+      autoFillFromBlock,
+      blockMinutes
+    ),
+    instrument: resolveDualFieldMinutes(
+      input.dualIfEnabled,
+      input.dualIfTime,
+      autoFillFromBlock,
+      blockMinutes
+    ),
+    multi: resolveDualFieldMinutes(
+      input.dualMultiEnabled,
+      input.dualMultiTime,
+      autoFillFromBlock,
+      blockMinutes
+    ),
   };
 }
 
@@ -80,7 +132,7 @@ export function sumDualBreakdownMinutes(breakdown: DualBreakdownMinutes) {
 export function dualBreakdownExceedsBlockTime(input: FlightSaveInput, outTime: string, inTime: string) {
   const blockMinutes = blockMinutesFromOutIn(outTime, inTime);
   if (blockMinutes === null) return false;
-  const breakdown = parseDualBreakdownMinutes(input);
+  const breakdown = parseDualBreakdownMinutes(input, blockMinutes);
   return Object.values(breakdown).some((minutes) => minutes !== null && minutes > blockMinutes);
 }
 
@@ -88,9 +140,51 @@ export function dualBreakdownExceedsBlockTime(input: FlightSaveInput, outTime: s
 export function dualBreakdownSumExceedsBlockTime(input: FlightSaveInput, outTime: string, inTime: string) {
   const blockMinutes = blockMinutesFromOutIn(outTime, inTime);
   if (blockMinutes === null) return false;
-  const breakdown = parseDualBreakdownMinutes(input);
+  const breakdown = parseDualBreakdownMinutes(input, blockMinutes);
   const total = sumDualBreakdownMinutes(breakdown);
   return total > blockMinutes;
+}
+
+export function validateDualBreakdown(input: FlightSaveInput, blockMinutes: number | null): string | null {
+  const selectionCount = countDualBreakdownSelections(input);
+  const requiresManualTimes = selectionCount > 1;
+  const breakdown = parseDualBreakdownMinutes(input, blockMinutes);
+  const total = sumDualBreakdownMinutes(breakdown);
+
+  if (selectionCount <= 0) return null;
+
+  if (blockMinutes === null || blockMinutes <= 0) {
+    return 'Enter Out and In time before logging dual breakdown hours.';
+  }
+
+  if (requiresManualTimes) {
+    if (input.dualExtraEnabled && breakdown.extra === null) {
+      return 'Enter a duration for Extra / Other.';
+    }
+    if (input.dualNightEnabled && breakdown.night === null) {
+      return 'Enter a duration for Night.';
+    }
+    if (input.dualIfEnabled && breakdown.instrument === null) {
+      return 'Enter a duration for IF.';
+    }
+    if (input.dualMultiEnabled && breakdown.multi === null) {
+      return 'Enter a duration for Multi.';
+    }
+  }
+
+  if (total <= 0) {
+    return 'Could not apply dual breakdown hours.';
+  }
+
+  if (Object.values(breakdown).some((minutes) => minutes !== null && minutes > blockMinutes)) {
+    return 'Each dual category cannot exceed total block time (Out–In).';
+  }
+
+  if (total > blockMinutes) {
+    return 'Combined dual categories cannot exceed total block time (Out–In).';
+  }
+
+  return null;
 }
 
 export function formatDateISO(dateValue: Date) {
@@ -219,9 +313,9 @@ export function buildFlightSavePayload(input: FlightSaveInput): Record<string, u
   const blockMinutes = blockMinutesFromOutIn(input.outTime, input.inTime);
   const capacity = input.operatingCapacity.trim().toLowerCase();
   const roleTimes = deriveRoleTimeMinutes(blockMinutes, capacity);
-  const dualBreakdown = parseDualBreakdownMinutes(input);
+  const dualBreakdown = parseDualBreakdownMinutes(input, blockMinutes);
   const dualBreakdownTotal = sumDualBreakdownMinutes(dualBreakdown);
-  const picBreakdown = parsePicBreakdownMinutes(input.picBreakdown);
+  const picBreakdown = parsePicBreakdownMinutes(input.picBreakdown, blockMinutes);
   const picBreakdownTotal = sumPicBreakdownMinutes(picBreakdown);
   const crossCountryMinutes = toMinutes(input.crossCountryTotal);
 

@@ -15,16 +15,15 @@ import { useSupabaseSession } from '@/utils/auth';
 import {
   blockMinutesFromOutIn,
   buildFlightSavePayload,
-  dualBreakdownExceedsBlockTime,
-  dualBreakdownSumExceedsBlockTime,
+  countDualBreakdownSelections,
   fetchLastFlightDefaults,
   formatDateISO,
   formatDuration,
   formatTimeFromDb,
   isCompleteTimeEntry,
   minutesToHHMM,
-  parseDualBreakdownMinutes,
   toMinutes,
+  validateDualBreakdown,
   type FlightSaveInput,
 } from '@/utils/flight-form';
 import { BottomSheetModal } from '@/components/BottomSheetModal';
@@ -127,6 +126,7 @@ function DualCategoryRow({
   time,
   onTimeChange,
   blockMinutes,
+  showTimeInput,
 }: {
   label: string;
   enabled: boolean;
@@ -134,9 +134,11 @@ function DualCategoryRow({
   time: string;
   onTimeChange: (value: string) => void;
   blockMinutes: number | null;
+  showTimeInput: boolean;
 }) {
   const exceedsBlock =
     enabled &&
+    showTimeInput &&
     blockMinutes !== null &&
     blockMinutes > 0 &&
     (() => {
@@ -154,7 +156,7 @@ function DualCategoryRow({
           trackColor={{ false: '#475569', true: '#2563eb' }}
         />
       </View>
-      {enabled ? (
+      {enabled && showTimeInput ? (
         <View className="mt-2">
           <TextField value={time} onChangeText={onTimeChange} placeholder="HH:MM" keyboardType="numeric" />
           {blockMinutes !== null && blockMinutes > 0 ? (
@@ -369,6 +371,12 @@ export default function AddFlightScreen() {
     ]
   );
 
+  const dualSelectionCount = useMemo(
+    () => countDualBreakdownSelections(formInput),
+    [formInput]
+  );
+  const showDualTimeInputs = dualSelectionCount >= 2;
+
   const saveAirportForUser = async (airport: AirportOption) => {
     const userId = session?.user?.id;
     if (!userId) return { error: 'You are not logged in.' };
@@ -555,45 +563,10 @@ export default function AddFlightScreen() {
       return;
     }
 
-    const enabledDualFields = [
-      dualExtraEnabled,
-      dualNightEnabled,
-      dualIfEnabled,
-      dualMultiEnabled,
-    ].filter(Boolean);
-
-    if (enabledDualFields.length > 0) {
-      const block = blockMinutesFromOutIn(outTime, inTime);
-      if (block === null) {
-        setError('Enter Out and In time before logging dual breakdown hours.');
-        return;
-      }
-
-      const breakdown = parseDualBreakdownMinutes(formInput);
-      if (dualExtraEnabled && breakdown.extra === null) {
-        setError('Enter a duration for Extra / Other.');
-        return;
-      }
-      if (dualNightEnabled && breakdown.night === null) {
-        setError('Enter a duration for Night.');
-        return;
-      }
-      if (dualIfEnabled && breakdown.instrument === null) {
-        setError('Enter a duration for IF.');
-        return;
-      }
-      if (dualMultiEnabled && breakdown.multi === null) {
-        setError('Enter a duration for Multi.');
-        return;
-      }
-
-      if (dualBreakdownExceedsBlockTime(formInput, outTime, inTime)) {
-        setError('Each dual category cannot exceed total block time (Out–In).');
-        return;
-      }
-
-      if (dualBreakdownSumExceedsBlockTime(formInput, outTime, inTime)) {
-        setError('Combined dual categories cannot exceed total block time (Out–In).');
+    if (showDualBreakdown) {
+      const dualError = validateDualBreakdown(formInput, blockMinutesFromOutIn(outTime, inTime));
+      if (dualError) {
+        setError(dualError);
         return;
       }
     }
@@ -859,7 +832,12 @@ export default function AddFlightScreen() {
         ) : null}
 
         {showDualBreakdown ? (
-          <RoleHoursContainer title="Dual" subtitle="Toggle categories and log time for each">
+          <RoleHoursContainer title="Dual" subtitle="Toggle categories to log dual hours">
+            {dualSelectionCount === 1 && blockMinutes !== null && blockMinutes > 0 ? (
+              <Text className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+                Block time ({formatDuration(blockMinutes)}) will apply to the selected category.
+              </Text>
+            ) : null}
             <DualCategoryRow
               label="Extra / Other"
               enabled={dualExtraEnabled}
@@ -867,6 +845,7 @@ export default function AddFlightScreen() {
               time={dualExtraTime}
               onTimeChange={setDualExtraTime}
               blockMinutes={blockMinutes}
+              showTimeInput={showDualTimeInputs}
             />
             <DualCategoryRow
               label="Night"
@@ -875,6 +854,7 @@ export default function AddFlightScreen() {
               time={dualNightTime}
               onTimeChange={setDualNightTime}
               blockMinutes={blockMinutes}
+              showTimeInput={showDualTimeInputs}
             />
             <DualCategoryRow
               label="IF"
@@ -883,6 +863,7 @@ export default function AddFlightScreen() {
               time={dualIfTime}
               onTimeChange={setDualIfTime}
               blockMinutes={blockMinutes}
+              showTimeInput={showDualTimeInputs}
             />
             <DualCategoryRow
               label="Multi"
@@ -891,6 +872,7 @@ export default function AddFlightScreen() {
               time={dualMultiTime}
               onTimeChange={setDualMultiTime}
               blockMinutes={blockMinutes}
+              showTimeInput={showDualTimeInputs}
             />
           </RoleHoursContainer>
         ) : null}
