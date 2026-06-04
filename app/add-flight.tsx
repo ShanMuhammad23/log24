@@ -5,12 +5,12 @@ import {
   ActivityIndicator,
   Pressable,
   ScrollView,
-  Switch,
   Text,
   TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { CollapsibleCategoryRow } from '@/components/flight-form/CollapsibleCategoryRow';
 import { useSupabaseSession } from '@/utils/auth';
 import {
   blockMinutesFromOutIn,
@@ -147,17 +147,12 @@ function DualCategoryRow({
     })();
 
   return (
-    <View className="mb-3 last:mb-0">
-      <View className="flex-row items-center justify-between">
-        <Text className="text-sm font-medium text-slate-700 dark:text-slate-200">{label}</Text>
-        <Switch
-          value={enabled}
-          onValueChange={onEnabledChange}
-          trackColor={{ false: '#475569', true: '#2563eb' }}
-        />
-      </View>
-      {enabled && showTimeInput ? (
-        <View className="mt-2">
+    <CollapsibleCategoryRow
+      label={label}
+      expanded={enabled}
+      onExpandedChange={onEnabledChange}>
+      {showTimeInput ? (
+        <View>
           <TextField value={time} onChangeText={onTimeChange} placeholder="HH:MM" keyboardType="numeric" />
           {blockMinutes !== null && blockMinutes > 0 ? (
             <Text className="mt-1 text-xs text-slate-500 dark:text-slate-400">
@@ -169,7 +164,7 @@ function DualCategoryRow({
           ) : null}
         </View>
       ) : null}
-    </View>
+    </CollapsibleCategoryRow>
   );
 }
 

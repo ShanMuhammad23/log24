@@ -1,4 +1,5 @@
-import { Pressable, Switch, Text, TextInput, View } from 'react-native';
+import { Pressable, Text, TextInput, View } from 'react-native';
+import { CollapsibleCategoryRow } from '@/components/flight-form/CollapsibleCategoryRow';
 import { formatDuration, toMinutes } from '@/utils/flight-form';
 import { countPicBreakdownSelections, type PicBreakdownFormState, type PicCctsPeriod } from '@/utils/pic-breakdown';
 
@@ -36,76 +37,6 @@ function TimeInput({
       ) : null}
       {exceedsBlock ? (
         <Text className="mt-1 text-xs text-red-400">Cannot exceed block time.</Text>
-      ) : null}
-    </View>
-  );
-}
-
-function CategoryToggle({
-  label,
-  hint,
-  enabled,
-  onEnabledChange,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  enabled: boolean;
-  onEnabledChange: (value: boolean) => void;
-  children?: React.ReactNode;
-}) {
-  return (
-    <View className="mb-4 last:mb-0">
-      <View className="flex-row items-center justify-between">
-        <View className="flex-1 pr-3">
-          <Text className="text-sm font-medium text-slate-700 dark:text-slate-200">{label}</Text>
-          {hint ? <Text className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{hint}</Text> : null}
-        </View>
-        <Switch
-          value={enabled}
-          onValueChange={onEnabledChange}
-          trackColor={{ false: '#475569', true: '#2563eb' }}
-        />
-      </View>
-      {enabled && children ? <View className="mt-2">{children}</View> : null}
-    </View>
-  );
-}
-
-function SubCategoryToggle({
-  label,
-  hint,
-  enabled,
-  onEnabledChange,
-  time,
-  onTimeChange,
-  blockMinutes,
-  showTimeInput,
-}: {
-  label: string;
-  hint?: string;
-  enabled: boolean;
-  onEnabledChange: (value: boolean) => void;
-  time: string;
-  onTimeChange: (value: string) => void;
-  blockMinutes: number | null;
-  showTimeInput: boolean;
-}) {
-  return (
-    <View className="mb-3 ml-2 border-l-2 border-slate-200 pl-3 last:mb-0 dark:border-slate-700">
-      <View className="flex-row items-center justify-between">
-        <View className="flex-1 pr-3">
-          <Text className="text-sm text-slate-700 dark:text-slate-200">{label}</Text>
-          {hint ? <Text className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{hint}</Text> : null}
-        </View>
-        <Switch
-          value={enabled}
-          onValueChange={onEnabledChange}
-          trackColor={{ false: '#475569', true: '#2563eb' }}
-        />
-      </View>
-      {enabled && showTimeInput ? (
-        <TimeInput value={time} onChangeText={onTimeChange} blockMinutes={blockMinutes} />
       ) : null}
     </View>
   );
@@ -163,10 +94,10 @@ export function PicBreakdownSection({ value, onChange, blockMinutes }: PicBreakd
   return (
     <View>
       {blockTimeHint}
-      <CategoryToggle
+      <CollapsibleCategoryRow
         label="CCTS (30 Hr)"
-        enabled={value.cctsEnabled}
-        onEnabledChange={(enabled) =>
+        expanded={value.cctsEnabled}
+        onExpandedChange={(enabled) =>
           patch({
             cctsEnabled: enabled,
             cctsPeriod: enabled ? value.cctsPeriod : null,
@@ -192,23 +123,23 @@ export function PicBreakdownSection({ value, onChange, blockMinutes }: PicBreakd
         ) : (
           <Text className="mt-2 text-xs text-slate-500 dark:text-slate-400">Select Day or Night.</Text>
         )}
-      </CategoryToggle>
+      </CollapsibleCategoryRow>
 
-      <CategoryToggle
+      <CollapsibleCategoryRow
         label="XCTY (50 Hr)"
-        enabled={value.xctyEnabled}
-        onEnabledChange={(xctyEnabled) =>
+        expanded={value.xctyEnabled}
+        onExpandedChange={(xctyEnabled) =>
           patch({ xctyEnabled, xctyTime: xctyEnabled ? value.xctyTime : '' })
         }>
         {showTimeInputs ? (
           <TimeInput value={value.xctyTime} onChangeText={(xctyTime) => patch({ xctyTime })} blockMinutes={blockMinutes} />
         ) : null}
-      </CategoryToggle>
+      </CollapsibleCategoryRow>
 
-      <CategoryToggle
+      <CollapsibleCategoryRow
         label="Night"
-        enabled={value.nightCategoryEnabled}
-        onEnabledChange={(nightCategoryEnabled) =>
+        expanded={value.nightCategoryEnabled}
+        onExpandedChange={(nightCategoryEnabled) =>
           patch({
             nightCategoryEnabled,
             nightCategoryTime: nightCategoryEnabled ? value.nightCategoryTime : '',
@@ -221,12 +152,12 @@ export function PicBreakdownSection({ value, onChange, blockMinutes }: PicBreakd
             blockMinutes={blockMinutes}
           />
         ) : null}
-      </CategoryToggle>
+      </CollapsibleCategoryRow>
 
-      <CategoryToggle
+      <CollapsibleCategoryRow
         label="GFT Checks (8 Hr)"
-        enabled={value.gftChecksEnabled}
-        onEnabledChange={(gftChecksEnabled) =>
+        expanded={value.gftChecksEnabled}
+        onExpandedChange={(gftChecksEnabled) =>
           patch({
             gftChecksEnabled,
             gft300nmEnabled: gftChecksEnabled ? value.gft300nmEnabled : false,
@@ -236,70 +167,90 @@ export function PicBreakdownSection({ value, onChange, blockMinutes }: PicBreakd
             gftNightEnabled: gftChecksEnabled ? value.gftNightEnabled : false,
           })
         }>
-        <SubCategoryToggle
+        <CollapsibleCategoryRow
           label="300 NM (GFT)"
           hint="4–5 Hr — counts toward cross country"
-          enabled={value.gft300nmEnabled}
-          onEnabledChange={(gft300nmEnabled) =>
+          nested
+          expanded={value.gft300nmEnabled}
+          onExpandedChange={(gft300nmEnabled) =>
             patch({ gft300nmEnabled, gft300nmTime: gft300nmEnabled ? value.gft300nmTime : '' })
-          }
-          time={value.gft300nmTime}
-          onTimeChange={(gft300nmTime) => patch({ gft300nmTime })}
-          blockMinutes={blockMinutes}
-          showTimeInput={showTimeInputs}
-        />
-        <SubCategoryToggle
+          }>
+          {showTimeInputs ? (
+            <TimeInput
+              value={value.gft300nmTime}
+              onChangeText={(gft300nmTime) => patch({ gft300nmTime })}
+              blockMinutes={blockMinutes}
+            />
+          ) : null}
+        </CollapsibleCategoryRow>
+        <CollapsibleCategoryRow
           label="250 NM"
           hint="3 1/2 Hr"
-          enabled={value.gft250nmEnabled}
-          onEnabledChange={(gft250nmEnabled) =>
+          nested
+          expanded={value.gft250nmEnabled}
+          onExpandedChange={(gft250nmEnabled) =>
             patch({ gft250nmEnabled, gft250nmTime: gft250nmEnabled ? value.gft250nmTime : '' })
-          }
-          time={value.gft250nmTime}
-          onTimeChange={(gft250nmTime) => patch({ gft250nmTime })}
-          blockMinutes={blockMinutes}
-          showTimeInput={showTimeInputs}
-        />
-        <SubCategoryToggle
+          }>
+          {showTimeInputs ? (
+            <TimeInput
+              value={value.gft250nmTime}
+              onChangeText={(gft250nmTime) => patch({ gft250nmTime })}
+              blockMinutes={blockMinutes}
+            />
+          ) : null}
+        </CollapsibleCategoryRow>
+        <CollapsibleCategoryRow
           label="120 NM"
           hint="2 1/2 Hr"
-          enabled={value.gft120nmEnabled}
-          onEnabledChange={(gft120nmEnabled) =>
+          nested
+          expanded={value.gft120nmEnabled}
+          onExpandedChange={(gft120nmEnabled) =>
             patch({ gft120nmEnabled, gft120nmTime: gft120nmEnabled ? value.gft120nmTime : '' })
-          }
-          time={value.gft120nmTime}
-          onTimeChange={(gft120nmTime) => patch({ gft120nmTime })}
-          blockMinutes={blockMinutes}
-          showTimeInput={showTimeInputs}
-        />
-        <SubCategoryToggle
+          }>
+          {showTimeInputs ? (
+            <TimeInput
+              value={value.gft120nmTime}
+              onChangeText={(gft120nmTime) => patch({ gft120nmTime })}
+              blockMinutes={blockMinutes}
+            />
+          ) : null}
+        </CollapsibleCategoryRow>
+        <CollapsibleCategoryRow
           label="Day"
-          enabled={value.gftDayEnabled}
-          onEnabledChange={(gftDayEnabled) =>
+          nested
+          expanded={value.gftDayEnabled}
+          onExpandedChange={(gftDayEnabled) =>
             patch({ gftDayEnabled, gftDayTime: gftDayEnabled ? value.gftDayTime : '' })
-          }
-          time={value.gftDayTime}
-          onTimeChange={(gftDayTime) => patch({ gftDayTime })}
-          blockMinutes={blockMinutes}
-          showTimeInput={showTimeInputs}
-        />
-        <SubCategoryToggle
+          }>
+          {showTimeInputs ? (
+            <TimeInput
+              value={value.gftDayTime}
+              onChangeText={(gftDayTime) => patch({ gftDayTime })}
+              blockMinutes={blockMinutes}
+            />
+          ) : null}
+        </CollapsibleCategoryRow>
+        <CollapsibleCategoryRow
           label="Night"
-          enabled={value.gftNightEnabled}
-          onEnabledChange={(gftNightEnabled) =>
+          nested
+          expanded={value.gftNightEnabled}
+          onExpandedChange={(gftNightEnabled) =>
             patch({ gftNightEnabled, gftNightTime: gftNightEnabled ? value.gftNightTime : '' })
-          }
-          time={value.gftNightTime}
-          onTimeChange={(gftNightTime) => patch({ gftNightTime })}
-          blockMinutes={blockMinutes}
-          showTimeInput={showTimeInputs}
-        />
-      </CategoryToggle>
+          }>
+          {showTimeInputs ? (
+            <TimeInput
+              value={value.gftNightTime}
+              onChangeText={(gftNightTime) => patch({ gftNightTime })}
+              blockMinutes={blockMinutes}
+            />
+          ) : null}
+        </CollapsibleCategoryRow>
+      </CollapsibleCategoryRow>
 
-      <CategoryToggle
+      <CollapsibleCategoryRow
         label="Multi Checks"
-        enabled={value.multiChecksEnabled}
-        onEnabledChange={(multiChecksEnabled) =>
+        expanded={value.multiChecksEnabled}
+        onExpandedChange={(multiChecksEnabled) =>
           patch({
             multiChecksEnabled,
             multiDayEnabled: multiChecksEnabled ? value.multiDayEnabled : false,
@@ -307,43 +258,55 @@ export function PicBreakdownSection({ value, onChange, blockMinutes }: PicBreakd
             multiIrtEnabled: multiChecksEnabled ? value.multiIrtEnabled : false,
           })
         }>
-        <SubCategoryToggle
+        <CollapsibleCategoryRow
           label="Day"
           hint="1 Hr"
-          enabled={value.multiDayEnabled}
-          onEnabledChange={(multiDayEnabled) =>
+          nested
+          expanded={value.multiDayEnabled}
+          onExpandedChange={(multiDayEnabled) =>
             patch({ multiDayEnabled, multiDayTime: multiDayEnabled ? value.multiDayTime : '' })
-          }
-          time={value.multiDayTime}
-          onTimeChange={(multiDayTime) => patch({ multiDayTime })}
-          blockMinutes={blockMinutes}
-          showTimeInput={showTimeInputs}
-        />
-        <SubCategoryToggle
+          }>
+          {showTimeInputs ? (
+            <TimeInput
+              value={value.multiDayTime}
+              onChangeText={(multiDayTime) => patch({ multiDayTime })}
+              blockMinutes={blockMinutes}
+            />
+          ) : null}
+        </CollapsibleCategoryRow>
+        <CollapsibleCategoryRow
           label="Night"
           hint="1 Hr"
-          enabled={value.multiNightEnabled}
-          onEnabledChange={(multiNightEnabled) =>
+          nested
+          expanded={value.multiNightEnabled}
+          onExpandedChange={(multiNightEnabled) =>
             patch({ multiNightEnabled, multiNightTime: multiNightEnabled ? value.multiNightTime : '' })
-          }
-          time={value.multiNightTime}
-          onTimeChange={(multiNightTime) => patch({ multiNightTime })}
-          blockMinutes={blockMinutes}
-          showTimeInput={showTimeInputs}
-        />
-        <SubCategoryToggle
+          }>
+          {showTimeInputs ? (
+            <TimeInput
+              value={value.multiNightTime}
+              onChangeText={(multiNightTime) => patch({ multiNightTime })}
+              blockMinutes={blockMinutes}
+            />
+          ) : null}
+        </CollapsibleCategoryRow>
+        <CollapsibleCategoryRow
           label="IRT"
           hint="2 1/2 Hr"
-          enabled={value.multiIrtEnabled}
-          onEnabledChange={(multiIrtEnabled) =>
+          nested
+          expanded={value.multiIrtEnabled}
+          onExpandedChange={(multiIrtEnabled) =>
             patch({ multiIrtEnabled, multiIrtTime: multiIrtEnabled ? value.multiIrtTime : '' })
-          }
-          time={value.multiIrtTime}
-          onTimeChange={(multiIrtTime) => patch({ multiIrtTime })}
-          blockMinutes={blockMinutes}
-          showTimeInput={showTimeInputs}
-        />
-      </CategoryToggle>
+          }>
+          {showTimeInputs ? (
+            <TimeInput
+              value={value.multiIrtTime}
+              onChangeText={(multiIrtTime) => patch({ multiIrtTime })}
+              blockMinutes={blockMinutes}
+            />
+          ) : null}
+        </CollapsibleCategoryRow>
+      </CollapsibleCategoryRow>
     </View>
   );
 }
