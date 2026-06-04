@@ -15,6 +15,7 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to fetch METAR data.';
-    return Response.json({ error: message }, { status: 502 });
+    const status = message.startsWith('No weather data found for') ? 404 : 502;
+    return Response.json({ error: message }, { status });
   }
 }

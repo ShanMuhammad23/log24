@@ -1,7 +1,7 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Link, Redirect } from 'expo-router';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Dimensions, Pressable, ScrollView, Text, View } from 'react-native';
+import { Dimensions, Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { useColorScheme } from '@/components/useColorScheme';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSupabaseSession } from '@/utils/auth';
@@ -96,15 +96,7 @@ export default function GetStartedScreen() {
       <View className="px-8 pt-16 pb-6">
         <View className="items-center">
           {/* Logo Mark */}
-          <View className="flex-row items-center justify-center gap-2">
-          <View className="mb-4 h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 shadow-lg shadow-blue-600/25">
-            <FontAwesome name="plane" size={28} color="#ffffff" />
-          </View>
-          
-          <Text className="text-3xl font-bold tracking-tight text-blue-600 dark:text-blue-600">
-            Log24
-          </Text>
-          </View>
+          <Image source={require('@/assets/images/logo.jpeg')} style={{ width: 100, height: 100 }} />
           
           <Text className="mt-2 text-center text-base text-slate-500 dark:text-slate-400">
             Your digital pilot logbook starts here

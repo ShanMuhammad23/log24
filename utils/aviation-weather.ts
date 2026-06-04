@@ -51,6 +51,10 @@ export async function fetchMetarReports(stationId: string): Promise<MetarReport[
     headers: { Accept: 'application/json' },
   });
 
+  if (response.status === 404) {
+    throw new Error(`No weather data found for ${ids}. Verify the ICAO station ID.`);
+  }
+
   if (!response.ok) {
     throw new Error(`Weather service returned ${response.status}.`);
   }
