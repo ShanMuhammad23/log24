@@ -27,22 +27,38 @@ export type CalculatorRouteHref =
 
 export interface NavlogLeg {
   id: string;
-  name: string;
-  course: string;
-  distance: string;
+  checkpoint: string;
+  trueCourse: string;
+  altitude: string;
   tas: string;
   windDir: string;
   windSpeed: string;
   magVar: string;
-  fuelFlow: string;
+  magDev: string;
+  distance: string;
+}
+
+export interface NavlogSettings {
+  calculateTasFromIas: boolean;
+  fuelBurnGph: string;
+  /** Blank = ISA temp at row altitude when deriving TAS from IAS. */
+  oat: string;
 }
 
 export interface NavlogLegResult {
+  wca: number;
   trueHeading: number;
   magHeading: number;
+  compassHeading: number;
   groundSpeed: number;
-  ete: number;
+  timeHours: number;
   fuelUsed: number;
+  tas: number;
+}
+
+export interface NavlogSavedState {
+  legs: NavlogLeg[];
+  settings: NavlogSettings;
 }
 
 export interface WBItem {
@@ -60,6 +76,17 @@ export interface WindCorrectionResult {
 
 export type HoldSide = 'Right' | 'Left';
 export type EntryType = 'Direct' | 'Teardrop' | 'Parallel';
+export type HoldCourseMode = 'Inbound' | 'Outbound';
+
+export interface HoldingPatternResult {
+  inboundCourse: number;
+  outboundCourse: number;
+  inboundHeading: number;
+  outboundHeading: number;
+  inboundWca: number;
+  entryAngle: number;
+  entryType: EntryType;
+}
 
 export type MachMode = 'TAStoMach' | 'MachToTAS';
 
