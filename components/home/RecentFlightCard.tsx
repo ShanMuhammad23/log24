@@ -5,6 +5,9 @@ import { RecentFlight } from './types';
 type RecentFlightCardProps = {
   flight: RecentFlight;
   onPress?: () => void;
+  selectionMode?: boolean;
+  selected?: boolean;
+  onSelectionToggle?: () => void;
 };
 
 function FooterStat({ icon, label, value }: { icon: string; label: string; value: number }) {
@@ -18,12 +21,34 @@ function FooterStat({ icon, label, value }: { icon: string; label: string; value
   );
 }
 
-export function RecentFlightCard({ flight, onPress }: RecentFlightCardProps) {
+export function RecentFlightCard({
+  flight,
+  onPress,
+  selectionMode = false,
+  selected = false,
+  onSelectionToggle,
+}: RecentFlightCardProps) {
+  const handlePress = selectionMode ? onSelectionToggle : onPress;
+
   return (
     <Pressable
-      onPress={onPress}
-      className="mx-5 mb-3 rounded-2xl border border-blue-100 bg-white px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900">
+      onPress={handlePress}
+      className={`mx-5 mb-3 rounded-2xl border px-3 py-2.5 ${
+        selectionMode && selected
+          ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-950/40'
+          : 'border-blue-100 bg-white dark:border-slate-800 dark:bg-slate-900'
+      }`}>
       <View className="flex-row">
+        {selectionMode ? (
+          <View className="mr-2.5 items-center justify-center">
+            <View
+              className={`h-6 w-6 items-center justify-center rounded-md border-2 ${
+                selected ? 'border-blue-600 bg-blue-600' : 'border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-900'
+              }`}>
+              {selected ? <FontAwesome name="check" size={12} color="#ffffff" /> : null}
+            </View>
+          </View>
+        ) : null}
         <View className="w-12 items-center border-r border-slate-100 pr-2 dark:border-slate-700">
           <Text className="text-3xl font-semibold text-blue-700">{flight.day}</Text>
           <Text className="text-xs font-semibold uppercase text-blue-600">{flight.month}</Text>
@@ -41,7 +66,7 @@ export function RecentFlightCard({ flight, onPress }: RecentFlightCardProps) {
                 <Text className="text-[11px] font-medium text-blue-700">{flight.aircraft}</Text>
               </View>
             </View>
-            <FontAwesome name="angle-right" size={18} color="#94a3b8" />
+            {selectionMode ? null : <FontAwesome name="angle-right" size={18} color="#94a3b8" />}
           </View>
 
           <View className="mt-0.5 flex-row items-center justify-between">
