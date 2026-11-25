@@ -1,0 +1,297 @@
+import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { useColorScheme } from '@/components/useColorScheme';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { INK, MIST } from '@/constants/Colors';
+import { useSupabaseSession } from '@/utils/auth';
+import { syncDocumentExpiryNotifications } from '@/utils/document-notifications';
+import {
+  createPilotDocumentSignedUrl,
+  deletePilotDocument,
+  documentErrorMessage,
+  fetchPilotDocumentById,
+  daysUntilExpiry,
+  formatDocumentFileSize,
+  isImageMimeType,
+  PilotDocument,
+} from '@/utils/documents';
+
+function formatDate(value: string | null) {
+  if (!value) return 'N/A';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+const STATUS_STYLE = {
+  expired: { dot: 'bg-red-500', text: 'text-red-600 dark:text-red-400', label: 'Expired' },
+  expiring_soon: { dot: 'bg-amber-500', text: 'text-amber-600 dark:text-amber-400', label: 'Expiring soon' },
+  valid: { dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400', label: 'Valid' },
+} as const;
+
+function StatusBadge({ status }: { status: PilotDocument['status'] }) {
+  const style = STATUS_STYLE[status];
+  return (
+    <View className="flex-row items-center gap-1.5">
+      <View className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
+      <Text className={`text-xs font-semibold ${style.text}`}>{style.label}</Text>
+    </View>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View className="mb-3 flex-row items-start justify-between gap-3">
+      <Text className="text-sm text-sub dark:text-mist">{label}</Text>
+      <Text className="flex-1 text-right text-sm font-semibold text-ink dark:text-white">{value}</Text>
+    </View>
+  );
+}
+
+export default function DocumentDetailsScreen() {
+  const router = useRouter();
+  const isDark = useColorScheme() === 'dark';
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { session } = useSupabaseSession();
+  const [document, setDocument] = useState<PilotDocument | null>(null);
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [openingFile, setOpeningFile] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      const userId = session?.user?.id;
+      if (!userId || !id) {
+        if (!cancelled) setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      setFileError(null);
+      setFileUrl(null);
+
+      const { data, error } = await fetchPilotDocumentById(userId, id);
+      if (cancelled) return;
+
+      if (error || !data) {
+        setDocument(null);
+        setLoading(false);
+        return;
+      }
+
+      setDocument(data);
+
+      if (data.file_path) {
+        const { data: signed, error: signError } = await createPilotDocumentSignedUrl(data.file_path);
+        if (!cancelled) {
+          if (signError || !signed?.signedUrl) {
+            setFileError(signError?.message || 'Could not load file preview.');
+          } else {
+            setFileUrl(signed.signedUrl);
+          }
+        }
+      }
+
+      if (!cancelled) setLoading(false);
+    };
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, session?.user?.id]);
+
+  const handleDelete = () => {
+    const userId = session?.user?.id;
+    if (!userId || !document) return;
+
+    Alert.alert('Delete Document', `Delete "${document.document_name}"? This cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          setDeleting(true);
+          const { error } = await deletePilotDocument(userId, document.id);
+          setDeleting(false);
+          if (error) {
+            Alert.alert('Delete failed', documentErrorMessage(error));
+            return;
+          }
+          await syncDocumentExpiryNotifications(userId);
+          router.replace('/(tabs)/docs');
+        },
+      },
+    ]);
+  };
+
+  const openFileExternally = async () => {
+    if (!fileUrl) {
+      Alert.alert('File unavailable', fileError || 'No file is attached to this document.');
+      return;
+    }
+
+    setOpeningFile(true);
+    try {
+      await WebBrowser.openBrowserAsync(fileUrl);
+    } finally {
+      setOpeningFile(false);
+    }
+  };
+
+  if (!loading && !document) {
+    return (
+      <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-paper dark:bg-night">
+        <View className="flex-1 items-center justify-center px-6">
+          <Text className="text-base text-sub dark:text-mist">Document not found.</Text>
+          <Pressable onPress={() => router.back()} className="mt-4 rounded-lg bg-arc px-5 py-3">
+            <Text className="font-semibold text-night">Go Back</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const days = daysUntilExpiry(document?.expiry_date ?? null);
+
+  return (
+    <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-paper dark:bg-night">
+      <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 32 }}>
+        <View className="mb-4 flex-row items-center gap-3">
+          <Pressable onPress={() => router.back()} className="h-10 w-10 items-center justify-center rounded-lg border border-rule bg-white dark:border-ruleDark dark:bg-panel">
+            <FontAwesome name="angle-left" size={18} color={isDark ? MIST : INK} />
+          </Pressable>
+          <Text className="flex-1 text-xl font-bold text-ink dark:text-white">Document details</Text>
+        </View>
+
+        {loading ? (
+          <View className="mt-12 items-center">
+            <ActivityIndicator size="large" color="#2EA8FF" />
+          </View>
+        ) : document ? (
+          <Animated.View entering={FadeIn.duration(220)}>
+            <View className="mb-4 rounded-lg border border-rule dark:border-ruleDark bg-white dark:bg-panel p-4">
+              <View className="flex-row items-start">
+                <View className="mr-3 h-12 w-12 items-center justify-center rounded-lg bg-arc/10 dark:bg-arc/15">
+                  <FontAwesome name="id-card-o" size={22} color="#2EA8FF" />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-xl font-bold text-ink dark:text-white">{document.document_name}</Text>
+                  <Text className="mt-1 text-sm text-sub dark:text-mist">{document.document_type}</Text>
+                  <View className="mt-2 self-start">
+                    <StatusBadge status={document.status} />
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            <View className="mb-4 rounded-lg border border-rule dark:border-ruleDark bg-white dark:bg-panel p-4">
+              <Text className="mb-3 text-base font-semibold text-ink dark:text-white">Information</Text>
+              <DetailRow label="Issuer" value={document.issuer?.trim() || '—'} />
+              <DetailRow label="Issue date" value={formatDate(document.issue_date)} />
+              <DetailRow label="Expiry date" value={formatDate(document.expiry_date)} />
+              <DetailRow
+                label="Expiry"
+                value={
+                  days === null
+                    ? '—'
+                    : days < 0
+                      ? `Expired ${Math.abs(days)} days ago`
+                      : `In ${days} days`
+                }
+              />
+              <DetailRow
+                label="Reminder"
+                value={
+                  document.reminder_days_before != null
+                    ? `${document.reminder_days_before} days before`
+                    : '—'
+                }
+              />
+              <DetailRow label="Uploaded" value={formatDate(document.created_at)} />
+              {document.notes?.trim() ? (
+                <View className="mt-1 border-t border-rule dark:border-ruleDark pt-3">
+                  <Text className="text-sm text-sub dark:text-mist">Notes</Text>
+                  <Text className="mt-1 text-sm leading-5 text-ink dark:text-white">{document.notes.trim()}</Text>
+                </View>
+              ) : null}
+            </View>
+
+            <View className="rounded-lg border border-rule dark:border-ruleDark bg-white dark:bg-panel p-4">
+              <Text className="mb-3 text-base font-semibold text-ink dark:text-white">Attached file</Text>
+
+              {document.file_path ? (
+                <>
+                  <DetailRow label="File name" value={document.file_name || '—'} />
+                  <DetailRow label="Type" value={document.mime_type || '—'} />
+                  <DetailRow label="Size" value={formatDocumentFileSize(document.size_bytes)} />
+
+                  {fileUrl && isImageMimeType(document.mime_type) ? (
+                    <View className="my-3 overflow-hidden rounded-lg border border-rule dark:border-ruleDark bg-paper dark:bg-night">
+                      <Image source={{ uri: fileUrl }} className="h-72 w-full" resizeMode="contain" />
+                    </View>
+                  ) : null}
+
+                  {fileError ? <Text className="mb-3 text-sm text-red-500 dark:text-red-400">{fileError}</Text> : null}
+
+                  <Pressable
+                    onPress={openFileExternally}
+                    disabled={openingFile || !fileUrl}
+                    className="flex-row items-center justify-center gap-2 rounded-lg bg-arc py-3 active:opacity-90 disabled:opacity-60">
+                    {openingFile ? (
+                      <ActivityIndicator color="#0A1428" />
+                    ) : (
+                      <>
+                        <FontAwesome name="external-link" size={16} color="#0A1428" />
+                        <Text className="text-base font-semibold text-night">
+                          {isImageMimeType(document.mime_type) ? 'Open full file' : 'View file'}
+                        </Text>
+                      </>
+                    )}
+                  </Pressable>
+                </>
+              ) : (
+                <Text className="text-sm text-sub dark:text-mist">No file was uploaded for this document.</Text>
+              )}
+            </View>
+
+            <View className="mt-4 flex-row gap-3">
+              <Pressable
+                onPress={() => router.push({ pathname: '/add-document', params: { id: document.id } })}
+                className="flex-1 items-center rounded-lg border border-rule dark:border-ruleDark bg-white dark:bg-panel py-3.5 active:bg-paper dark:active:bg-night">
+                <Text className="text-base font-semibold text-arcDeep dark:text-arc">Edit</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleDelete}
+                disabled={deleting}
+                className="flex-1 items-center rounded-lg border border-red-200 bg-red-50 py-3.5 active:bg-red-100 dark:border-red-900/60 dark:bg-red-950/40 disabled:opacity-60">
+                {deleting ? (
+                  <ActivityIndicator color="#dc2626" />
+                ) : (
+                  <Text className="text-base font-semibold text-red-600 dark:text-red-400">Delete</Text>
+                )}
+              </Pressable>
+            </View>
+          </Animated.View>
+        ) : null}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
